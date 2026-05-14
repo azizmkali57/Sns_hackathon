@@ -1,0 +1,90 @@
+sns/
+   public/
+        logo.png
+        icons/
+            alert-icon.png
+            badge.png
+   app/
+        (auth)/
+            login/page.jsx
+            register/page.jsx
+            forgot-password/page.jsx
+            reset-password/page.jsx
+            layout.jsx    
+
+        dashboard/page.jsx
+        navigate/page.jsx
+        guardian/page.jsx
+        profile/page.jsx
+        report/page.jsx
+
+        api/
+            auth/
+                login/route.js
+                register/route.js
+                forgot-password/route.js
+                reset-password/route.js
+
+            contacts/ 
+                add/route.js
+                delete/route.js
+                update/route.js
+                get/route.js
+
+            sos/route.js 
+            incidents/route.js 
+
+            routes/
+               create/route.js 
+               compare/route.js
+
+            tracking/
+               update/route.js
+
+            navigation/
+               start/route.js
+               stop/route.js  
+
+        layout.js
+        page.js
+
+    components/
+            layout/
+                 header.jsx
+                 footer.jsx
+            
+            home/
+                AlertPopup.jsx
+                MapView.jsx
+                RouteCard.jsx
+                SOSButton.jsx
+                RouteSelector.jsx
+                LiveTracker.jsx
+                RiskIndicator.jsx
+              
+    Models/
+         User.js
+         contact.js
+         Route.js
+         Incident.js
+         SOS.js
+         Tracking.js
+         NavigationSession.js 
+
+    lib/
+         connectDB.js
+         auth.js 
+         osrm.js
+         scoring.js
+         mapUtils.js
+         routeAnalyzer.js
+         twilio.js 
+
+    services/
+         routeService.js
+         alertService.js
+         sosService.js
+         contactService.js
+
+    .env.local
+    package.json
