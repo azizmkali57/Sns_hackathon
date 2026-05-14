@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import connectDB from "@/lib/connectDB";
 import User from "@/Models/User";
-import { sendResetEmail } from "@/lib/mailer";
 
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000;
 

@@ -5,14 +5,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import RouteCard from "@/components/home/RouteCard";
-import SOSButton from "@/components/home/SOSButton";
-import AlertPopup from "@/components/home/AlertPopup";
 import Footer from "@/components/layout/Footer";
 
 import {
   FiSearch, FiHome, FiUser, FiAlertTriangle, FiMapPin, FiEye,
 } from "react-icons/fi";
 import { MdSecurity } from "react-icons/md";
+import SOSButton from "@/components/Home/SOSButton";
 
 const MapView = dynamic(() => import("@/components/home/MapView"), { ssr: false });
 
