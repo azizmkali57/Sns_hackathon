@@ -3,7 +3,8 @@ import Link from "next/link";
 import {
   MdDashboard, MdNavigation, MdShield, MdReport, MdPerson,
 } from "react-icons/md";
-import { SiOpenstreetmap } from "react-icons/si";
+// import { SiOpenstreetmap } from "react-icons/si";
+import link from "next/link";
 import { FiGithub, FiExternalLink } from "react-icons/fi";
 
 const QUICK_LINKS = [
@@ -100,14 +101,15 @@ export default function Footer() {
             © 2025 SafeRoute SNS. Built with <span className="text-[#39D353]">♥</span> for safer streets.
           </p>
           <div className="flex items-center gap-5">
-            {["Privacy Policy", "Terms of Use", "API Docs"].map((t) => (
-              <a key={t} href="#" className="text-[11px] text-white/25 hover:text-[#00D1FF] no-underline transition-colors duration-200 flex items-center gap-1">
-                {t}
-              </a>
-            ))}
-            <a href="#" className="text-[11px] text-white/25 hover:text-[#00D1FF] no-underline transition-colors duration-200 flex items-center gap-1">
+            <Link href="./legal/TermsofUse" className="text-[11px] text-white/25 hover:text-[#00D1FF] no-underline transition-colors duration-200 flex items-center gap-1">
+              Terms of Use
+            </Link>
+            <Link href="./legal/privacyPolicy" className="text-[11px] text-white/25 hover:text-[#00D1FF] no-underline transition-colors duration-200 flex items-center gap-1">
+              Privacy Policy
+            </Link>
+            <Link href="#" className="text-[11px] text-white/25 hover:text-[#00D1FF] no-underline transition-colors duration-200 flex items-center gap-1">
               <FiGithub size={12} /> GitHub
-            </a>
+            </Link>
           </div>
         </div>
       </div>

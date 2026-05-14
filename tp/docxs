@@ -24,6 +24,12 @@ sns/
                 register/route.js
                 forgot-password/route.js
                 reset-password/route.js
+                me/route.js
+                logout/route.js
+
+            user/
+                journeys/route.js
+                settings/route.js  
 
             contacts/ 
                 add/route.js
@@ -47,6 +53,8 @@ sns/
 
         layout.js
         page.js
+        globals.css
+        providers.js
 
     components/
             layout/
@@ -61,7 +69,10 @@ sns/
                 RouteSelector.jsx
                 LiveTracker.jsx
                 RiskIndicator.jsx
-              
+
+    context/
+           AuthContext.jsx
+
     Models/
          User.js
          contact.js

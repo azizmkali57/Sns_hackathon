@@ -30,6 +30,14 @@ const userSchema = new mongoose.Schema(
       enum: ["user", "admin"],
       default: "user",
     },
+    // ── Safety preferences saved to DB ──────────────────────────────────────
+    settings: {
+      notifications: { type: Boolean, default: true  },
+      guardian:      { type: Boolean, default: true  },
+      sosAuto:       { type: Boolean, default: true  },
+      whatsapp:      { type: Boolean, default: true  },
+      crowdsource:   { type: Boolean, default: false },
+    },
     resetToken: {
       type: String,
       default: null,

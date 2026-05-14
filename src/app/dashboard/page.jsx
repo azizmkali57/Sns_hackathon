@@ -7,6 +7,8 @@ import MapView       from "@/components/Home/MapView";
 import SOSButton     from "@/components/Home/SOSButton";
 import RouteSelector from "@/components/Home/RouteSelector";
 import { FiShield, FiAlertTriangle, FiUsers, FiPhoneCall } from "react-icons/fi";
+import Header from "@/components/layout/Header"
+import Footer from "@/components/layout/Footer"
 
 const BASE_STATS = [
   { key: "safety",    label: "Safety Score",     sub: "Best route",     color: "#39D353", Icon: FiShield        },
@@ -76,6 +78,7 @@ export default function DashboardPage() {
 
   return (
     <>
+      <Header />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -160,6 +163,7 @@ export default function DashboardPage() {
       </div>
 
       <AlertPopup alerts={alerts} onDismiss={(id) => setAlerts((a) => a.filter((x) => x.id !== id))} position="bottom-right" />
+    <Footer />
     </>
   );
 }

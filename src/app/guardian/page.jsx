@@ -10,6 +10,8 @@ import {
 
 import { FiRadio } from "react-icons/fi";
 import SOSButton from "@/components/Home/SOSButton";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 
 const SYNC_INTERVAL_MS = 15_000;
 
@@ -460,7 +462,7 @@ export default function GuardianPage() {
 
   return (
     <div className="min-h-screen bg-[#081120] pt-[100px] pb-16 text-[#F5F7FA] font-[Inter,sans-serif] relative overflow-hidden">
-
+      <Header />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -814,6 +816,7 @@ export default function GuardianPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

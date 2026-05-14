@@ -1,28 +1,25 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  MdDashboard,
-  MdNavigation,
-  MdShield,
-  MdReport,
-  MdPerson,
-  MdMenu,
-  MdClose,
+  MdDashboard, MdNavigation, MdShield,
+  MdReport, MdPerson, MdMenu, MdClose, MdLogout,
 } from "react-icons/md";
 import { FiAlertOctagon } from "react-icons/fi";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV_LINKS = [
-  { href: "/dashboard", label: "Dashboard", icon: MdDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: MdDashboard  },
   { href: "/navigate",  label: "Navigate",  icon: MdNavigation },
-  { href: "/guardian",  label: "Guardian",  icon: MdShield },
-  { href: "/report",    label: "Report",    icon: MdReport },
-  { href: "/profile",   label: "Profile",   icon: MdPerson },
+  { href: "/guardian",  label: "Guardian",  icon: MdShield     },
+  { href: "/report",    label: "Report",    icon: MdReport     },
+  { href: "/profile",   label: "Profile",   icon: MdPerson     },
 ];
 
 export default function Header() {
-  const pathname  = usePathname();
+  const pathname           = usePathname();
+  const { user, logout }   = useAuth();
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
 
@@ -31,6 +28,11 @@ export default function Header() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Build initials from real user name
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : null;
 
   return (
     <>
@@ -44,7 +46,7 @@ export default function Header() {
         <div className="max-w-7xl mx-auto h-16 flex items-center justify-between">
 
           <Link href="/dashboard" className="flex items-center gap-3 no-underline">
-             <img src="./images/logo.png" alt="SafeRoute Logo" className="w-32" />
+            <img src="/images/logo.png" alt="SafeRoute Logo" className="w-32" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -76,9 +78,18 @@ export default function Header() {
               SOS
             </button>
 
+            {/* Avatar — shows real initials when logged in, icon when not */}
             <Link href="/profile">
-              <div className="w-9 h-9 rounded-full border border-[#00D1FF]/30 bg-gradient-to-br from-[#00D1FF]/13 to-[#39D353]/13 flex items-center justify-center text-sm cursor-pointer hover:border-[#00D1FF] hover:shadow-[0_0_12px_rgba(0,209,255,0.3)] transition-all duration-200">
-                <MdPerson size={18} className="text-white/70" />
+              <div className="w-9 h-9 rounded-full border border-[#00D1FF]/30 bg-gradient-to-br from-[#00D1FF]/13 to-[#39D353]/13 flex items-center justify-center cursor-pointer hover:border-[#00D1FF] hover:shadow-[0_0_12px_rgba(0,209,255,0.3)] transition-all duration-200 overflow-hidden"
+                title={user?.name ?? "Profile"}
+              >
+                {initials ? (
+                  <span className="text-[13px] font-bold text-white font-[Poppins,sans-serif]">
+                    {initials}
+                  </span>
+                ) : (
+                  <MdPerson size={18} className="text-white/70" />
+                )}
               </div>
             </Link>
 
@@ -91,6 +102,7 @@ export default function Header() {
           </div>
         </div>
 
+        {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden bg-[#081120]/95 backdrop-blur-xl border-t border-white/5 px-4 pb-4">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => {
@@ -109,16 +121,35 @@ export default function Header() {
                 </Link>
               );
             })}
+
+            {/* Logout in mobile menu */}
+            {user && (
+              <button
+                onClick={() => { setMenuOpen(false); logout(); }}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium mt-1 text-[#FF4D4D]/70 bg-transparent border-0 w-full cursor-pointer"
+              >
+                <MdLogout size={16} />
+                Sign Out
+              </button>
+            )}
           </div>
         )}
       </header>
 
+      {/* Status bar */}
       <div className="fixed top-16 left-0 right-0 z-40 bg-[#39D353]/8 border-b border-[#39D353]/20 py-1.5 px-6 flex items-center justify-center gap-5 flex-wrap">
         <span className="flex items-center gap-1.5 text-[11px] font-medium text-white/50 tracking-widest uppercase">
           <span className="w-1.5 h-1.5 rounded-full bg-[#39D353] shadow-[0_0_6px_#39D353] animate-pulse inline-block" />
           System Active
         </span>
         <span className="text-white/20">|</span>
+        {/* Show real user name if logged in */}
+        {user && (
+          <>
+            <span className="text-[11px] text-white/50 tracking-wider">👤 {user.name}</span>
+            <span className="text-white/20">|</span>
+          </>
+        )}
         <span className="text-[11px] text-white/50 tracking-wider">📍 Indore, MP</span>
         <span className="text-white/20">|</span>
         <span className="text-[11px] text-white/50 tracking-wider">🛰 GPS Locked</span>
@@ -129,7 +160,7 @@ export default function Header() {
       <style>{`
         @keyframes sosPulse {
           0%, 100% { box-shadow: 0 0 20px rgba(255,77,77,0.35); }
-          50%       { box-shadow: 0 0 32px rgba(255,77,77,0.6); }
+          50%       { box-shadow: 0 0 32px rgba(255,77,77,0.6);  }
         }
       `}</style>
     </>
