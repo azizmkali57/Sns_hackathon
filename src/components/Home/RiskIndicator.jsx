@@ -10,7 +10,6 @@ import {
   MdRoad, MdBlock, MdWarningAmber,
 } from "react-icons/md";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const band = (score) =>
   score >= 80
     ? { label: "Safe",     color: "#39D353", glow: "rgba(57,211,83,0.22)",  border: "rgba(57,211,83,0.25)",  bg: "rgba(57,211,83,0.07)",  Icon: FiShield }
@@ -31,7 +30,6 @@ const FACTOR_META = {
 
 const TIME_ICONS = { morning: FiSun, afternoon: FiSun, evening: FiSunset, night: FiMoon };
 
-// ─── Variant: ring ────────────────────────────────────────────────────────────
 function RingVariant({ score, size = "md", showLabel = true, animate = false }) {
   const b    = band(score);
   const dim  = size === "sm" ? 48 : size === "lg" ? 88 : 64;
@@ -73,7 +71,6 @@ function RingVariant({ score, size = "md", showLabel = true, animate = false }) 
   );
 }
 
-// ─── Variant: bar ─────────────────────────────────────────────────────────────
 function BarVariant({ score, breakdown = {}, compact = false, timePeriod }) {
   const b = band(score);
   const TimeIcon = timePeriod ? (TIME_ICONS[timePeriod] ?? FiSun) : null;
@@ -105,7 +102,6 @@ function BarVariant({ score, breakdown = {}, compact = false, timePeriod }) {
              }} />
       </div>
 
-      {/* Factor breakdown */}
       {!compact && Object.keys(FACTOR_META).length > 0 && (
         <div className="flex flex-col gap-1.5 mt-1">
           {Object.entries(FACTOR_META).map(([key, meta]) => {
@@ -126,7 +122,6 @@ function BarVariant({ score, breakdown = {}, compact = false, timePeriod }) {
         </div>
       )}
 
-      {/* Band chip */}
       <span className="self-start mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold
                        uppercase tracking-wide border"
             style={{ color: b.color, background: b.bg, borderColor: b.border }}>
@@ -137,7 +132,6 @@ function BarVariant({ score, breakdown = {}, compact = false, timePeriod }) {
   );
 }
 
-// ─── Variant: badge ───────────────────────────────────────────────────────────
 function BadgeVariant({ score, pulse = false }) {
   const b = band(score);
   return (
@@ -153,7 +147,6 @@ function BadgeVariant({ score, pulse = false }) {
   );
 }
 
-// ─── Variant: panel (live fetch + full risk report) ───────────────────────────
 function PanelVariant({ lat, lng, initialScore }) {
   const [report,  setReport]  = useState(null);
   const [loading, setLoading] = useState(true);
@@ -220,7 +213,6 @@ function PanelVariant({ lat, lng, initialScore }) {
 
       {report && (
         <>
-          {/* Score ring + band */}
           <div className="flex items-center gap-4">
             <RingVariant score={score} size="lg" showLabel={false} animate />
             <div className="flex-1">
@@ -236,7 +228,6 @@ function PanelVariant({ lat, lng, initialScore }) {
             </div>
           </div>
 
-          {/* Factor bars */}
           <div className="flex flex-col gap-1.5">
             {Object.entries(FACTOR_META).map(([key, meta]) => {
               const val = report.breakdown?.[key] ?? 0;
@@ -255,7 +246,6 @@ function PanelVariant({ lat, lng, initialScore }) {
             })}
           </div>
 
-          {/* Risk breakdown chips */}
           <div className="grid grid-cols-2 gap-2">
             {[
               { label: "Traffic Risk",   val: report.riskBreakdown?.trafficRisk  ?? 0 },
@@ -277,7 +267,6 @@ function PanelVariant({ lat, lng, initialScore }) {
             })}
           </div>
 
-          {/* Nearby incidents */}
           {report.incidentCount > 0 && (
             <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl
                             bg-[#FFC857]/07 border border-[#FFC857]/20">
@@ -295,7 +284,6 @@ function PanelVariant({ lat, lng, initialScore }) {
             </div>
           )}
 
-          {/* Hotspots */}
           {report.hotspots?.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <p className="text-[10px] font-semibold text-white/25 uppercase tracking-[0.12em]">
@@ -324,22 +312,18 @@ function PanelVariant({ lat, lng, initialScore }) {
   );
 }
 
-// ─── Public export ────────────────────────────────────────────────────────────
-
 /**
- * RiskIndicator
- *
- * @param {number}                  score       — 0-100
+ * @param {number}                  score      
  * @param {"ring"|"bar"|"badge"|"panel"} variant
- * @param {object}                  breakdown   — factor scores
- * @param {string}                  timePeriod  — "morning"|"afternoon"|"evening"|"night"
- * @param {"sm"|"md"|"lg"}          size        — ring size
+ * @param {object}                  breakdown 
+ * @param {string}                  timePeriod 
+ * @param {"sm"|"md"|"lg"}          size        
  * @param {boolean}                 showLabel
- * @param {boolean}                 compact     — bar: hide factor rows
- * @param {boolean}                 pulse       — badge: animate
- * @param {boolean}                 animate     — ring: animate on mount
- * @param {number}                  lat         — panel: live fetch lat
- * @param {number}                  lng         — panel: live fetch lng
+ * @param {boolean}                 compact    
+ * @param {boolean}                 pulse     
+ * @param {boolean}                 animate    
+ * @param {number}                  lat        
+ * @param {number}                  lng       
  * @param {string}                  className
  */
 export default function RiskIndicator({

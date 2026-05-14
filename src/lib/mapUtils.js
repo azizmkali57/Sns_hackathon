@@ -130,7 +130,7 @@ export function routeProgress(currentLat, currentLng, routeCoords) {
 }
 
 export function buildOverpassQuery(lat, lng, radiusKm = 0.3) {
-  const r = radiusKm * 1000; // metres
+  const r = radiusKm * 1000; 
   return `
     [out:json][timeout:25];
     (

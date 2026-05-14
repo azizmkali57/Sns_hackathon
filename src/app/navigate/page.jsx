@@ -15,14 +15,12 @@ const SCORE_COLOR = (s) => s == null ? "#00D1FF" : s >= 80 ? "#39D353" : s >= 50
 const SCORE_LABEL = (s) => s == null ? "—" : s >= 80 ? "Safe" : s >= 50 ? "Moderate" : "Unsafe";
 const POLL_MS = 15_000;
 
-// ─── Step icon helper ─────────────────────────────────────────────────────────
 function StepIcon({ type }) {
   if (type?.includes("left"))  return <MdTurnLeft  size={16} />;
   if (type?.includes("right")) return <MdTurnRight size={16} />;
   return <MdStraight size={16} />;
 }
 
-// ─── Directions panel ─────────────────────────────────────────────────────────
 function DirectionsPanel({ steps = [], activeStep = 0, onStepClick }) {
   const activeRef = useRef(null);
 
@@ -42,7 +40,6 @@ function DirectionsPanel({ steps = [], activeStep = 0, onStepClick }) {
         <span className="text-[10px] text-white/20">{steps.length} steps</span>
       </div>
 
-      {/* Active step highlight */}
       {steps[activeStep] && (
         <div className="px-4 py-3 bg-[#00D1FF]/06 border-b border-[#00D1FF]/15 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#00D1FF]/15 border border-[#00D1FF]/30 flex items-center justify-center text-[#00D1FF] flex-shrink-0">
@@ -66,7 +63,6 @@ function DirectionsPanel({ steps = [], activeStep = 0, onStepClick }) {
         </div>
       )}
 
-      {/* Scrollable step list */}
       <div className="max-h-52 overflow-y-auto">
         {steps.map((step, i) => (
           <div
@@ -77,7 +73,6 @@ function DirectionsPanel({ steps = [], activeStep = 0, onStepClick }) {
               ${i === activeStep ? "bg-[#00D1FF]/05" : "hover:bg-white/[0.02]"}
               ${i < activeStep  ? "opacity-40" : ""}`}
           >
-            {/* Step number dot */}
             <div className="flex flex-col items-center gap-1 flex-shrink-0 pt-0.5">
               <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold
                 ${i === activeStep ? "bg-[#00D1FF] text-[#081120]" : i < activeStep ? "bg-[#39D353]/30 text-[#39D353]" : "bg-white/10 text-white/40"}`}>
@@ -103,19 +98,16 @@ function DirectionsPanel({ steps = [], activeStep = 0, onStepClick }) {
   );
 }
 
-// ─── Main Navigate Page ───────────────────────────────────────────────────────
 export default function NavigatePage() {
   const router = useRouter();
 
-  // Session
   const [sessionId,    setSessionId]    = useState(null);
   const [destination,  setDestination]  = useState(null);
   const [mapRoutes,    setMapRoutes]    = useState([]);
   const [selectedIdx,  setSelectedIdx]  = useState(0);
-  const [activeSteps,  setActiveSteps]  = useState([]);   // steps of selected route
-  const [activeStep,   setActiveStep]   = useState(0);    // current step index
+  const [activeSteps,  setActiveSteps]  = useState([]);
+  const [activeStep,   setActiveStep]   = useState(0);   
 
-  // Live tracking
   const [userLocation, setUserLocation] = useState(null);
   const [tracking,     setTracking]     = useState(null);
   const [alerts,       setAlerts]       = useState([]);
@@ -127,7 +119,6 @@ export default function NavigatePage() {
   const elapsedRef = useRef(null);
   const startRef   = useRef(Date.now());
 
-  // ── Load session from sessionStorage ──────────────────────────────────────
   useEffect(() => {
     const sid    = sessionStorage.getItem("snr_session_id");
     const routes = sessionStorage.getItem("snr_routes");
@@ -153,7 +144,6 @@ export default function NavigatePage() {
     setStarted(true);
   }, [router]);
 
-  // ── GPS polling ────────────────────────────────────────────────────────────
   const pushUpdate = useCallback(async () => {
     if (!sessionId || !navigator.geolocation) return;
 
@@ -207,7 +197,6 @@ export default function NavigatePage() {
     return () => { clearInterval(pollRef.current); clearInterval(elapsedRef.current); };
   }, [started, sessionId, pushUpdate]);
 
-  // ── Stop navigation ────────────────────────────────────────────────────────
   const stopNavigation = useCallback(async (reason = "cancelled") => {
     clearInterval(pollRef.current);
     clearInterval(elapsedRef.current);
@@ -224,7 +213,6 @@ export default function NavigatePage() {
     router.push("/dashboard");
   }, [sessionId, router]);
 
-  // ── SOS ────────────────────────────────────────────────────────────────────
   const handleSOS = useCallback(async () => {
     if (!userLocation) return;
     try {
@@ -239,7 +227,6 @@ export default function NavigatePage() {
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   const score = tracking?.locationScore ?? null;
 
-  // ── Arrived ────────────────────────────────────────────────────────────────
   if (completed) {
     return (
       <div className="min-h-screen bg-[#081120] flex items-center justify-center font-[Inter,sans-serif]">
@@ -275,7 +262,6 @@ export default function NavigatePage() {
       <div className="np">
         <div className="ni">
 
-          {/* ── Top bar ─────────────────────────────────────────────────── */}
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <h1 className="text-[22px] font-bold font-[Poppins,sans-serif]">Live Navigation</h1>
@@ -294,7 +280,6 @@ export default function NavigatePage() {
             </div>
           </div>
 
-          {/* ── Progress bar ───────────────────────────────────────────── */}
           <div className="mb-5">
             <div className="flex justify-between text-[10px] text-white/30 mb-1.5">
               <span>Route progress</span>
@@ -305,7 +290,6 @@ export default function NavigatePage() {
 
           <div className="ng">
 
-            {/* ── Map + directions ─────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
               <MapView
                 routes={mapRoutes}
@@ -315,14 +299,12 @@ export default function NavigatePage() {
                 destination={destination}
               />
 
-              {/* ✅ Turn-by-turn directions panel */}
               <DirectionsPanel
                 steps={activeSteps}
                 activeStep={activeStep}
                 onStepClick={setActiveStep}
               />
 
-              {/* Alert cards */}
               {alerts.length > 0 && (
                 <div className="flex flex-col gap-2">
                   {alerts.slice(0, 3).map((a) => (
@@ -343,10 +325,8 @@ export default function NavigatePage() {
               )}
             </div>
 
-            {/* ── Sidebar ──────────────────────────────────────────────── */}
             <div className="flex flex-col gap-3">
 
-              {/* ✅ Area safety score ring — updates from tracking API */}
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 flex items-center gap-4">
                 <div className="relative w-16 h-16 flex-shrink-0">
                   <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
@@ -373,7 +353,6 @@ export default function NavigatePage() {
                 </div>
               </div>
 
-              {/* ✅ Live stats grid — all fed from tracking API */}
               <div className="grid grid-cols-2 gap-2.5">
                 {[
                   { icon: <FiMapPin size={13} />,     label: "Remaining", val: tracking ? `${tracking.remainingKm ?? "—"} km` : "—",        color: "#00D1FF" },
@@ -391,7 +370,6 @@ export default function NavigatePage() {
                 ))}
               </div>
 
-              {/* Reroute button when off-route */}
               {tracking?.isOffRoute && (
                 <button onClick={() => router.push("/dashboard")}
                         className="w-full py-3 rounded-xl bg-[#FFC857]/10 border border-[#FFC857]/30 text-[#FFC857] font-[Poppins,sans-serif] font-bold text-[12px] tracking-wide hover:bg-[#FFC857]/20 transition-all flex items-center justify-center gap-2">
@@ -399,7 +377,6 @@ export default function NavigatePage() {
                 </button>
               )}
 
-              {/* SOS */}
               <div className="bg-[#FF4D4D]/05 border border-[#FF4D4D]/15 rounded-2xl p-5 flex flex-col items-center gap-2">
                 <p className="text-[12px] font-semibold text-white/50 font-[Poppins,sans-serif]">Emergency SOS</p>
                 <SOSButton onSOS={handleSOS} compact={false} />

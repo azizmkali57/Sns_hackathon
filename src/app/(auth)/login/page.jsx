@@ -69,8 +69,6 @@ export default function Login() {
 
   return (
     <div className="w-full">
-
-      {/* ── Header ── */}
       <div className="flex flex-col items-center mb-8">
         <div className="bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-full p-3 mb-4">
           <FiShield className="text-[#22C55E] text-3xl" />
@@ -83,7 +81,6 @@ export default function Login() {
         </p>
       </div>
 
-      {/* ── Alert Messages ── */}
       {error && (
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/40
                         text-red-400 text-sm rounded-xl px-4 py-3 mb-5">
@@ -99,10 +96,8 @@ export default function Login() {
         </div>
       )}
 
-      {/* ── Form ── */}
       <form className="space-y-4" onSubmit={handleSubmit}>
 
-        {/* Email Field */}
         <div className="group">
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Email Address
@@ -125,7 +120,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Password Field */}
         <div className="group">
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Password
@@ -154,7 +148,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Forgot Password */}
         <div className="flex justify-end">
           <Link
             href="/forgot-password"
@@ -164,7 +157,6 @@ export default function Login() {
           </Link>
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
@@ -194,14 +186,12 @@ export default function Login() {
         </button>
       </form>
 
-      {/* ── Divider ── */}
       <div className="flex items-center gap-3 my-6">
         <div className="flex-1 h-px bg-[#1E293B]" />
         <span className="text-xs text-gray-600">or</span>
         <div className="flex-1 h-px bg-[#1E293B]" />
       </div>
 
-      {/* ── Register Link ── */}
       <p className="text-sm text-center text-gray-400">
         Don't have an account?{" "}
         <Link
@@ -212,7 +202,6 @@ export default function Login() {
         </Link>
       </p>
 
-      {/* ── Trust Badge ── */}
       <div className="flex items-center justify-center gap-2 mt-6">
         <FiShield className="text-gray-600 text-xs" />
         <span className="text-xs text-gray-600">

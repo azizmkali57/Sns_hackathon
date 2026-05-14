@@ -29,8 +29,6 @@ export default function DashboardPage() {
     safety: "—", incidents: "—", users: "142", sos: "ON",
   });
 
-  // Called by RouteSelector with (route, idx, allRoutes, docId, srcCoords, dstCoords)
-  // allRoutes now includes geometry + steps from the fixed API
   const handleRouteSelect = useCallback((route, idx, allRoutes, docId, srcCoords, dstCoords) => {
     setSelectedIdx(idx);
     setMapRoutes(allRoutes ?? []);               // ✅ full routes with geometry

@@ -1,4 +1,4 @@
-import {parseOSRMRoutes, fetchOSRMRoutes } from "@/lib/osrm.js";  //getRoutes
+import {parseOSRMRoutes, fetchOSRMRoutes } from "@/lib/osrm.js"; 
 import { analyzeRoutes } from "@/lib/routeAnalyzer.js";
 import Route from "@/Models/Route.js";
 import dbConnect from "@/lib/connectDB.js"; 

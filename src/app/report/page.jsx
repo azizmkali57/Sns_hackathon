@@ -61,7 +61,6 @@ export default function ReportPage() {
 
       <div className="max-w-5xl mx-auto px-6 relative z-10">
 
-        {/* Page header */}
         <div className="mb-7">
           <h1 className="text-[26px] font-extrabold text-[#F5F7FA] tracking-tight font-[Poppins,sans-serif]">
             Report an <span className="text-[#FFC857]">Incident</span>
@@ -71,7 +70,6 @@ export default function ReportPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
 
-          {/* Form */}
           <div className="bg-white/3 border border-white/7 rounded-2xl p-7">
             {submitted ? (
               <div className="flex flex-col items-center justify-center gap-3 py-12 text-center animate-[fadeIn_.4s_ease]">
@@ -163,7 +161,6 @@ export default function ReportPage() {
               ))}
             </div>
 
-            {/* Recent reports */}
             <div className="bg-white/3 border border-white/6 rounded-2xl p-5">
               <p className="text-[12px] font-semibold text-white/30 tracking-[0.12em] uppercase mb-4 font-[Poppins,sans-serif]">Recent Reports Near You</p>
               {RECENT_REPORTS.map((r, i) => (

@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import {
-  MdVerified, MdShield, MdRoute, MdReport,
-  MdNotifications, MdSecurity, MdSos, MdWhatsapp, MdVisibility, MdPerson,
+  MdVerified, MdShield,
+  MdSos, MdWhatsapp, MdVisibility, MdPerson,
 } from "react-icons/md";
 import { FiBell, FiToggleLeft, FiToggleRight } from "react-icons/fi";
 
@@ -40,7 +40,6 @@ export default function ProfilePage() {
   const avgScore = Math.round(JOURNEY_HISTORY.reduce((s, j) => s + j.score, 0) / JOURNEY_HISTORY.length);
 
   return (
-    /* pt-[100px] = header(64) + status-bar(~36) */
     <div className="min-h-screen bg-[#081120] pt-[100px] pb-16 text-[#F5F7FA] font-[Inter,sans-serif] relative">
       <div className="absolute inset-0 pointer-events-none"
         style={{background:"radial-gradient(ellipse 700px 500px at 50% 20%,rgba(0,209,255,.04) 0%,transparent 70%)"}}
@@ -48,11 +47,9 @@ export default function ProfilePage() {
 
       <div className="max-w-5xl mx-auto px-6 relative z-10">
 
-        {/* Hero card */}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#00D1FF]/6 to-[#39D353]/4 border border-[#00D1FF]/15 rounded-3xl p-8 flex flex-col md:flex-row items-center md:items-start gap-7 mb-5">
           <div className="absolute top-[-60px] right-[-60px] w-56 h-56 rounded-full bg-[radial-gradient(circle,rgba(0,209,255,.08),transparent)] pointer-events-none" />
 
-          {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-[90px] h-[90px] rounded-full bg-gradient-to-br from-[#00D1FF]/13 to-[#39D353]/13 border-2 border-[#00D1FF]/30 flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(0,209,255,.2)]">
               <MdPerson size={50} className="text-white/60" />
@@ -62,7 +59,6 @@ export default function ProfilePage() {
             </span>
           </div>
 
-          {/* Info */}
           <div className="flex-1 text-center md:text-left">
             <h1 className="text-[24px] font-extrabold text-[#F5F7FA] tracking-tight font-[Poppins,sans-serif] mb-1">Aditya Sharma</h1>
             <p className="text-[12.5px] text-[#00D1FF] font-medium mb-3">Verified SafeRoute User · Indore, MP</p>
@@ -73,7 +69,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3.5 flex-shrink-0">
             {[
               { val: avgScore, lbl: "Avg Safety Score" },
@@ -88,7 +83,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-white/3 border border-white/6 rounded-xl p-1 mb-5 w-fit">
           {TABS.map((tab) => (
             <button
@@ -105,11 +99,9 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Content */}
         {(activeTab === "overview" || activeTab === "history") && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px]">
 
-            {/* Journey list */}
             <div className="bg-white/3 border border-white/6 rounded-2xl p-5">
               <p className="text-[12px] font-semibold text-white/30 tracking-[0.12em] uppercase mb-4 font-[Poppins,sans-serif]">Recent Journeys</p>
               {JOURNEY_HISTORY.map((j, i) => (
@@ -129,7 +121,6 @@ export default function ProfilePage() {
               ))}
             </div>
 
-            {/* Safety trend */}
             <div className="bg-white/3 border border-white/6 rounded-2xl p-5">
               <p className="text-[12px] font-semibold text-white/30 tracking-[0.12em] uppercase mb-4 font-[Poppins,sans-serif]">Safety Trend</p>
 

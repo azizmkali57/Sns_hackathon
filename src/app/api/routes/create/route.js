@@ -1,11 +1,9 @@
-// app/api/routes/create/route.js
 import { NextResponse } from "next/server";
 import { createRoute }  from "@/services/routeService.js";
 import { verifyAuth }   from "@/lib/auth.js";
 
 export async function POST(req) {
   try {
-    // ── Auth ────────────────────────────────────────────────────────────────
     const auth = await verifyAuth(req);
     if (!auth.success || !auth.user?.id) {
       return NextResponse.json(
@@ -14,7 +12,6 @@ export async function POST(req) {
       );
     }
 
-    // ── Body validation ──────────────────────────────────────────────────────
     const body = await req.json().catch(() => ({}));
     const { source, destination } = body;
 
@@ -31,16 +28,12 @@ export async function POST(req) {
       );
     }
 
-    // ── Create route ─────────────────────────────────────────────────────────
     const routeDoc = await createRoute(
       auth.user.id,
       source.trim(),
       destination.trim()
     );
 
-    // ── Shape response ────────────────────────────────────────────────────────
-    // CRITICAL: geometry and steps MUST be included so the map can draw
-    // polylines and the directions panel can show turn-by-turn instructions.
     return NextResponse.json(
       {
         success: true,
@@ -50,7 +43,6 @@ export async function POST(req) {
           destination: routeDoc.destination,
           safetyScore: routeDoc.safetyScore,
 
-          // Source + destination coords — needed by MapView markers
           sourceCoords:      routeDoc.sourceCoords,
           destinationCoords: routeDoc.destinationCoords,
 
@@ -66,13 +58,10 @@ export async function POST(req) {
             explanation:  r.explanation,
             incidentCount: r.incidentCount,
 
-            // ✅ REQUIRED FOR MAP — GeoJSON LineString with all coordinates
             geometry:    r.geometry,
 
-            // ✅ REQUIRED FOR DIRECTIONS PANEL — turn-by-turn steps
             steps:       r.steps ?? [],
 
-            // Checkpoint lat/lngs (fallback if geometry missing)
             checkpoints: r.checkpoints ?? [],
           })),
 

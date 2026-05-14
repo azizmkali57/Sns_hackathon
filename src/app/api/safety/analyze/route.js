@@ -24,14 +24,13 @@ export async function POST(req) {
     let routeCoords = [];
     let highwayTag  = "primary";
 
-    // ── Source: raw coordinates array ────────────────────────────────────────
     if (Array.isArray(coordinates) && coordinates.length) {
       if (coordinates.length < 2)
         return NextResponse.json({ success: false, error: "At least 2 coordinates required" }, { status: 400 });
 
       routeCoords = coordinates.map((c) => ({ lat: parseFloat(c.lat), lng: parseFloat(c.lng) }));
     }
-    // ── Source: saved Route document ─────────────────────────────────────────
+
     else if (routeId) {
       await connectDB();
       const routeDoc = await Route.findById(routeId).lean();
@@ -56,7 +55,6 @@ export async function POST(req) {
     if (!routeCoords.length)
       return NextResponse.json({ success: false, error: "Could not extract route coordinates" }, { status: 400 });
 
-    // ── Run analysis ─────────────────────────────────────────────────────────
     const report = await analyzeRouteCorridor(routeCoords, { highwayTag });
 
     return NextResponse.json({ success: true, data: report }, { status: 200 });

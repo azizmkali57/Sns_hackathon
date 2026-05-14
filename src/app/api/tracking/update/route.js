@@ -3,12 +3,6 @@ import connectDB        from "@/lib/connectDB";
 import Tracking         from "@/Models/Tracking";
 import { verifyAuth }   from "@/lib/auth";
 
-/**
- * POST /api/tracking/update
- * Body: { lat, lng, speedKmh?, heading?, sessionId? }
- *
- * Upserts the user's live location (one doc per user via unique index on userId).
- */
 export async function POST(req) {
   try {
     const auth = await verifyAuth(req);
@@ -38,7 +32,6 @@ export async function POST(req) {
 
     await connectDB();
 
-    // Upsert — one tracking document per user
     const tracking = await Tracking.findOneAndUpdate(
       { userId: auth.user.id },
       {
@@ -73,10 +66,6 @@ export async function POST(req) {
   }
 }
 
-/**
- * GET /api/tracking/update
- * Returns the current user's last known location.
- */
 export async function GET(req) {
   try {
     const auth = await verifyAuth(req);

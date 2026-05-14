@@ -66,7 +66,6 @@ function ResetPasswordForm() {
   return (
     <div className="w-full">
 
-      {/* Header */}
       <div className="flex flex-col items-center mb-8">
         <div className="bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-full p-3 mb-4">
           <FiShield className="text-[#22C55E] text-3xl" />
@@ -79,7 +78,6 @@ function ResetPasswordForm() {
         </p>
       </div>
 
-      {/* Alerts */}
       {error && (
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/40
                         text-red-400 text-sm rounded-xl px-4 py-3 mb-5">
@@ -97,7 +95,6 @@ function ResetPasswordForm() {
 
       <form className="space-y-4" onSubmit={handleSubmit}>
 
-        {/* New Password */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             New Password
@@ -121,7 +118,6 @@ function ResetPasswordForm() {
           </div>
         </div>
 
-        {/* Confirm Password */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Confirm Password

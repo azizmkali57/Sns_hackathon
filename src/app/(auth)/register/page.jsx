@@ -82,7 +82,6 @@ export default function Register() {
   return (
     <div className="w-full">
 
-      {/* ── Header ── */}
       <div className="flex flex-col items-center mb-8">
         <div className="bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-full p-3 mb-4">
           <FiShield className="text-[#22C55E] text-3xl" />
@@ -111,10 +110,8 @@ export default function Register() {
         </div>
       )}
 
-      {/* ── Form ── */}
       <form className="space-y-4" onSubmit={handleSubmit}>
 
-        {/* Full Name */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Full Name <span className="text-red-400">*</span>
@@ -134,7 +131,6 @@ export default function Register() {
           </div>
         </div>
 
-        {/* Email */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Email Address <span className="text-red-400">*</span>
@@ -154,7 +150,6 @@ export default function Register() {
           </div>
         </div>
 
-        {/* Phone */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Phone Number
@@ -174,7 +169,6 @@ export default function Register() {
           </div>
         </div>
 
-        {/* Password */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Password <span className="text-red-400">*</span>
@@ -200,7 +194,6 @@ export default function Register() {
             </button>
           </div>
 
-          {/* Password strength indicator */}
           {formData.password && (
             <div className="flex gap-1 mt-2 pl-1">
               {[...Array(4)].map((_, i) => (
@@ -228,7 +221,6 @@ export default function Register() {
           )}
         </div>
 
-        {/* Confirm Password */}
         <div>
           <label className="text-xs text-gray-400 font-medium mb-1.5 block pl-1">
             Confirm Password <span className="text-red-400">*</span>
@@ -262,7 +254,6 @@ export default function Register() {
             </button>
           </div>
 
-          {/* Match indicator */}
           {formData.confirmPassword && (
             <p className={`text-xs mt-1.5 pl-1 ${
               formData.password === formData.confirmPassword
@@ -276,7 +267,6 @@ export default function Register() {
           )}
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -305,14 +295,12 @@ export default function Register() {
         </button>
       </form>
 
-      {/* ── Divider ── */}
       <div className="flex items-center gap-3 my-6">
         <div className="flex-1 h-px bg-[#1E293B]" />
         <span className="text-xs text-gray-600">or</span>
         <div className="flex-1 h-px bg-[#1E293B]" />
       </div>
 
-      {/* ── Login Link ── */}
       <p className="text-sm text-center text-gray-400">
         Already have an account?{" "}
         <Link href="/login"
@@ -321,7 +309,6 @@ export default function Register() {
         </Link>
       </p>
 
-      {/* ── Trust Badge ── */}
       <div className="flex items-center justify-center gap-2 mt-6">
         <FiShield className="text-gray-600 text-xs" />
         <span className="text-xs text-gray-600">

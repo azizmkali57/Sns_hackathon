@@ -3,8 +3,6 @@ import Incident  from "@/Models/Incident.js";
 import {
   calculateSafetyScore,
   explainScore,
-  getTimeAdjustedWeights,
-  getTimePeriod,
   rankRoutes,
 } from "../lib/scoring.js";
 import {
@@ -18,12 +16,7 @@ import {
 const OVERPASS_URL = process.env.OVERPASS_API_URL || "https://overpass-api.de/api/interpreter";
 const INCIDENT_LOOKBACK_DAYS = 7;
 
-// ─── OSM data fetch ───────────────────────────────────────────────────────────
-
 /**
- * Fetch OSM node counts for a lat/lng area via Overpass API
- * Gracefully returns zeroes on failure (non-blocking)
- *
  * @param {number} lat
  * @param {number} lng
  * @param {number} radiusKm
@@ -47,11 +40,7 @@ async function fetchOSMCounts(lat, lng, radiusKm = 0.4) {
   }
 }
 
-// ─── Incident fetch ───────────────────────────────────────────────────────────
-
 /**
- * Fetch active incidents near a bounding box from MongoDB
- *
  * @param {number} minLat
  * @param {number} maxLat
  * @param {number} minLng
@@ -73,16 +62,12 @@ async function fetchNearbyIncidents(minLat, maxLat, minLng, maxLng) {
     .lean();
 }
 
-// ─── Single-point analysis ────────────────────────────────────────────────────
-
 /**
- * Analyse safety for a single geographic point (used by live tracking)
- *
  * @param {number} lat
  * @param {number} lng
  * @param {object} opts
- * @param {string}  opts.highwayTag   — OSM highway type if known
- * @param {number}  opts.radiusKm     — search radius
+ * @param {string}  opts.highwayTag   
+ * @param {number}  opts.radiusKm     
  * @param {Date}    opts.now
  *
  * @returns {Promise<PointRiskReport>}
@@ -110,7 +95,6 @@ export async function analyzePoint(lat, lng, {
     now,
   });
 
-  // Categorise nearby incidents for the response
   const incidentSummary = incidents.reduce((acc, inc) => {
     acc[inc.type] = (acc[inc.type] ?? 0) + 1;
     return acc;
@@ -132,13 +116,8 @@ export async function analyzePoint(lat, lng, {
   };
 }
 
-// ─── Route corridor analysis ──────────────────────────────────────────────────
-
 /**
- * Analyse safety for an entire route (array of lat/lng coords)
- * Samples the route into segments and scores each, then aggregates.
- *
- * @param {Array<{lat:number,lng:number}>} routeCoords   — from geojsonToLatLng()
+ * @param {Array<{lat:number,lng:number}>} routeCoords  
  * @param {object} opts
  * @param {string}  opts.highwayTag
  * @param {Date}    opts.now
@@ -152,19 +131,16 @@ export async function analyzeRouteCorridor(routeCoords, {
   if (!routeCoords?.length) throw new Error("routeCoords is required");
 
   const bbox = boundingBox(routeCoords);
-
-  // Fetch OSM + incidents for entire bounding box in one call
   const [osmCounts, incidents] = await Promise.all([
     fetchOSMCounts(bbox.center.lat, bbox.center.lng, 0.6),
     fetchNearbyIncidents(bbox.minLat, bbox.maxLat, bbox.minLng, bbox.maxLng),
   ]);
 
-  // Filter incidents to only those actually near the route line
   const routeIncidents = incidents.filter((inc) =>
     isPointNearRoute(
       { lat: inc.location.lat, lng: inc.location.lng },
       routeCoords,
-      0.2   // 200 m tolerance
+      0.2  
     )
   );
 
@@ -188,7 +164,6 @@ export async function analyzeRouteCorridor(routeCoords, {
     now,
   });
 
-  // Hotspots — incidents grouped by severity
   const hotspots = routeIncidents
     .filter((i) => i.severity === "high")
     .map((i) => ({
@@ -213,11 +188,7 @@ export async function analyzeRouteCorridor(routeCoords, {
   };
 }
 
-// ─── Multi-route comparison ───────────────────────────────────────────────────
-
 /**
- * Analyse and rank multiple OSRM routes by safety score
- *
  * @param {Array<ParsedRoute>} parsedRoutes  — from parseOSRMRoutes()
  * @returns {Promise<EnrichedRoute[]>}       — sorted best-first
  */
@@ -258,18 +229,14 @@ export async function analyzeAndRankRoutes(parsedRoutes) {
   return rankRoutes(enriched);
 }
 
-// ─── Threshold checks (used by alertService) ──────────────────────────────────
 
 export const RISK_THRESHOLDS = {
-  DANGER:         40,   // score ≤ 40 → danger alert + consider SOS
-  WARNING:        60,   // score ≤ 60 → warning alert
-  LOW_SCORE_SOS:  25,   // auto-trigger SOS consideration
-  OFF_ROUTE_M:   200,   // metres before off-route alert
+  DANGER:         40,   
+  WARNING:        60,  
+  LOW_SCORE_SOS:  25,   
+  OFF_ROUTE_M:   200,   
 };
 
-/**
- * Evaluate a point score against thresholds and return alert objects
- */
 export function evaluateThresholds(score, { isOffRoute = false, remainingKm = 0 } = {}) {
   const alerts = [];
 

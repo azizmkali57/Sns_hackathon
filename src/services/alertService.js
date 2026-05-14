@@ -1,6 +1,6 @@
 import connectDB         from "@/lib/connectDB.js";
 import NavigationSession from "@/Models/NavigationSession.js";
-import { analyzePoint, evaluateThresholds, RISK_THRESHOLDS } from "./riskAnalysisService.js";
+import {evaluateThresholds, RISK_THRESHOLDS } from "./riskAnalysisService.js";
 import { triggerSOS }    from "./sosService.js";
 
 /**
@@ -27,10 +27,8 @@ export async function evaluateLocation({
 }) {
   await connectDB();
 
-  // Generate alert objects from thresholds
   const alerts = evaluateThresholds(locationScore, { isOffRoute, remainingKm });
 
-  // Persist to session document
   if (alerts.length && sessionId) {
     const now = new Date();
     await NavigationSession.findByIdAndUpdate(sessionId, {
@@ -47,7 +45,6 @@ export async function evaluateLocation({
     });
   }
 
-  // Auto-SOS if score is critically low
   if (locationScore <= RISK_THRESHOLDS.LOW_SCORE_SOS && sessionId) {
     try {
       await triggerSOS({
@@ -72,11 +69,6 @@ export async function evaluateLocation({
   return alerts;
 }
 
-// ─── Manual SOS (from UI button) ─────────────────────────────────────────────
-
-/**
- * Wrapper for the SOS button — delegates to sosService
- */
 export async function triggerManualSOS({ userId, userName, location, sessionId, safetyScore }) {
   return triggerSOS({
     userId,

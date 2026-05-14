@@ -5,7 +5,6 @@ import { FiSearch, FiMapPin, FiNavigation, FiRotateCcw, FiChevronRight, FiX } fr
 import { MdMyLocation } from "react-icons/md";
 import RouteCard from "./RouteCard";
 
-// ─── Nominatim autocomplete ───────────────────────────────────────────────────
 async function searchPlaces(query) {
   if (!query?.trim() || query.trim().length < 2) return [];
   const url = new URL("https://nominatim.openstreetmap.org/search");
@@ -25,7 +24,6 @@ async function searchPlaces(query) {
   }));
 }
 
-// ─── Single autocomplete input ────────────────────────────────────────────────
 function PlaceInput({ value, onChange, onSelect, placeholder, icon, accentColor, label, rightSlot }) {
   const [suggestions, setSuggestions] = useState([]);
   const [open,        setOpen]        = useState(false);
@@ -104,7 +102,6 @@ function PlaceInput({ value, onChange, onSelect, placeholder, icon, accentColor,
   );
 }
 
-// ─── Main RouteSelector ───────────────────────────────────────────────────────
 export default function RouteSelector({ onRouteSelect, onStartNavigation, className = "" }) {
   const [srcText,   setSrcText]   = useState("");
   const [dstText,   setDstText]   = useState("");
@@ -143,7 +140,6 @@ export default function RouteSelector({ onRouteSelect, onStartNavigation, classN
     setLoading(true); setError(null); setRoutes([]); setSearched(false);
 
     try {
-      // Geocode if user typed without selecting a suggestion
       let src = srcCoords;
       let dst = dstCoords;
 
@@ -167,10 +163,8 @@ export default function RouteSelector({ onRouteSelect, onStartNavigation, classN
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Failed to fetch routes");
 
-      // ✅ routes here include geometry + steps from the fixed API
       const fetchedRoutes = data.data.routes ?? [];
 
-      // ✅ Use sourceCoords/destinationCoords from API response if available
       const apiSrc = data.data.sourceCoords      ? { lat: data.data.sourceCoords.lat,      lng: data.data.sourceCoords.lng }      : src;
       const apiDst = data.data.destinationCoords ? { lat: data.data.destinationCoords.lat, lng: data.data.destinationCoords.lng } : dst;
 
@@ -179,7 +173,6 @@ export default function RouteSelector({ onRouteSelect, onStartNavigation, classN
       setSelected(0);
       setSearched(true);
 
-      // Pass full routes (with geometry) + coords back to parent (dashboard/page.jsx)
       onRouteSelect?.(fetchedRoutes[0], 0, fetchedRoutes, data.data.routeId, apiSrc, apiDst);
     } catch (err) {
       setError(err.message);

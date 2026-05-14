@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-// import { getServerSession } from "next-auth";
-// import { authOptions }      from "../../auth/[...nextauth]/route.js";
 import { analyzePoint }     from "@/services/riskAnalysisService.js";
 import { verifyAuth } from "@/lib/auth";
 
-// ── Shared handler ────────────────────────────────────────────────────────────
 async function handleRequest(lat, lng, highwayTag) {
   const latNum = parseFloat(lat);
   const lngNum = parseFloat(lng);
@@ -20,7 +17,6 @@ async function handleRequest(lat, lng, highwayTag) {
   return NextResponse.json({ success: true, data: report }, { status: 200 });
 }
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 export async function GET(req) {
   try {
         const auth = await verifyAuth(req);
@@ -46,7 +42,6 @@ export async function GET(req) {
   }
 }
 
-// ── POST ──────────────────────────────────────────────────────────────────────
 export async function POST(req) {
   try {
             const auth = await verifyAuth(req);

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-// import { getServerSession } from "next-auth";
 import NavigationSession from "@/Models/NavigationSession.js";
 import Route from "@/Models/Route.js";
 import dbConnect from "@/lib/connectDB.js";

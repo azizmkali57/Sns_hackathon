@@ -69,16 +69,11 @@ export async function sendWhatsApp(to, body) {
   });
 }
 
-// ─── SOS blast ────────────────────────────────────────────────────────────────
-
 /**
- * Send SOS via both SMS + WhatsApp to a single contact
- * Returns per-channel results
- *
- * @param {string} to            E.164 phone
- * @param {string} userName      Name of the person in distress
+ * @param {string} to          
+ * @param {string} userName    
  * @param {{ lat:number, lng:number }} location
- * @param {string} trackingLink  Google Maps URL
+ * @param {string} trackingLink  
  */
 export async function sendSOSAlert(to, userName, location, trackingLink) {
   const body =

@@ -1,3 +1,5 @@
+"use client";
+
 export default function AuthLayout({ children }) {
   return (
     <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-4">

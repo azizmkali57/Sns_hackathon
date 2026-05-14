@@ -4,8 +4,6 @@ import Contact           from "@/Models/contact.js";
 import NavigationSession from "@/Models/NavigationSession.js";
 import { sendSOSAlert }  from "@/lib/twilio.js";
 
-// ─── Reverse geocode (Nominatim) ─────────────────────────────────────────────
-
 async function reverseGeocode(lat, lng) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
@@ -19,8 +17,6 @@ async function reverseGeocode(lat, lng) {
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   }
 }
-
-// ─── Core SOS trigger ─────────────────────────────────────────────────────────
 
 /**
  * @param {object} p
@@ -43,19 +39,15 @@ export async function triggerSOS({
 }) {
   await connectDB();
 
-  // 1. Fetch all contacts for this user
   const contacts = await Contact.find({ userId }).lean();
 
   if (!contacts.length) {
-    // Still create the SOS record even with no contacts
     console.warn(`[sosService] No contacts for user ${userId} — SOS logged only`);
   }
 
-  // 2. Reverse geocode for a readable address in the SMS
   const address       = await reverseGeocode(location.lat, location.lng);
   const trackingLink  = `https://maps.google.com/?q=${location.lat},${location.lng}`;
 
-  // 3. Send alerts to every contact in parallel
   const notifiedContacts = await Promise.all(
     contacts.map(async (c) => {
       const result = await sendSOSAlert(
@@ -78,14 +70,12 @@ export async function triggerSOS({
     })
   );
 
-  // 4. Aggregate delivery status
   const allSmsSent      = notifiedContacts.every((c) => c.smsSent);
   const allWhatsappSent = notifiedContacts.every((c) => c.whatsappSent);
   const twilioSids      = notifiedContacts
     .flatMap((c) => [c.smsSid, c.whatsappSid])
     .filter(Boolean);
 
-  // 5. Persist SOS record
   const sosDoc = await SOS.create({
     userId,
     sessionId:            sessionId ?? null,
@@ -99,7 +89,6 @@ export async function triggerSOS({
     twilioSids,
   });
 
-  // 6. Update NavigationSession status
   if (sessionId) {
     await NavigationSession.findByIdAndUpdate(sessionId, {
       status: "sos_triggered",
@@ -128,11 +117,6 @@ export async function triggerSOS({
   };
 }
 
-// ─── Resolve SOS ─────────────────────────────────────────────────────────────
-
-/**
- * Mark an active SOS as resolved (user pressed "I'm Safe")
- */
 export async function resolveSOS(sosId, userId) {
   await connectDB();
 
@@ -148,11 +132,6 @@ export async function resolveSOS(sosId, userId) {
   return { success: true, sosId, resolvedAt: doc.resolvedAt };
 }
 
-// ─── History ──────────────────────────────────────────────────────────────────
-
-/**
- * Get SOS history for a user (newest first)
- */
 export async function getSOSHistory(userId, limit = 10) {
   await connectDB();
   return SOS.find({ userId })

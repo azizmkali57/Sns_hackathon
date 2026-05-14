@@ -1,32 +1,25 @@
 import connectDB from "@/lib/connectDB";
 import Contact   from "@/Models/contact";
 
-// ─── Validation ───────────────────────────────────────────────────────────────
-
 const ALLOWED_RELATIONS = [
   "Mother", "Father", "Sister", "Brother",
   "Friend", "Spouse", "Partner", "Colleague", "Other",
 ];
 
 function validatePhone(phone) {
-  // Accept E.164 format: +[country code][number], 7–15 digits
   return /^\+[1-9]\d{6,14}$/.test(phone.trim());
 }
 
-// ─── Max contacts per user ────────────────────────────────────────────────────
 const MAX_CONTACTS = 5;
 
-// ─── addContact ───────────────────────────────────────────────────────────────
 
 /**
- * Add a new emergency contact for a user.
  * @param {string} userId
  * @param {{ name:string, phone:string, relation:string, isPrimary?:boolean }} data
  */
 export async function addContact(userId, { name, phone, relation, isPrimary = false }) {
   await connectDB();
 
-  // Validate required fields
   if (!name?.trim())     throw new Error("Name is required");
   if (!phone?.trim())    throw new Error("Phone number is required");
   if (!relation?.trim()) throw new Error("Relation is required");
@@ -43,13 +36,11 @@ export async function addContact(userId, { name, phone, relation, isPrimary = fa
     );
   }
 
-  // Enforce max-contacts limit
   const count = await Contact.countDocuments({ userId });
   if (count >= MAX_CONTACTS) {
     throw new Error(`Maximum ${MAX_CONTACTS} emergency contacts allowed`);
   }
 
-  // If this is set as primary, unset all others first
   if (isPrimary) {
     await Contact.updateMany({ userId }, { $set: { isPrimary: false } });
   }
@@ -65,10 +56,7 @@ export async function addContact(userId, { name, phone, relation, isPrimary = fa
   return contact;
 }
 
-// ─── getContacts ──────────────────────────────────────────────────────────────
-
 /**
- * Get all emergency contacts for a user, primary first.
  * @param {string} userId
  * @returns {Promise<Array>}
  */
@@ -79,10 +67,7 @@ export async function getContacts(userId) {
     .lean();
 }
 
-// ─── deleteContact ────────────────────────────────────────────────────────────
-
 /**
- * Delete a contact — only the owning user can delete.
  * @param {string} contactId
  * @param {string} userId
  */
@@ -98,10 +83,7 @@ export async function deleteContact(contactId, userId) {
   return { deleted: true, contactId };
 }
 
-// ─── updateContact ────────────────────────────────────────────────────────────
-
 /**
- * Update a contact's fields — only the owning user can update.
  * @param {string} contactId
  * @param {string} userId
  * @param {Partial<{name,phone,relation,isPrimary}>} updates
@@ -129,7 +111,6 @@ export async function updateContact(contactId, userId, updates) {
     throw new Error(`Relation must be one of: ${ALLOWED_RELATIONS.join(", ")}`);
   }
 
-  // If setting as primary, clear others first
   if (updates.isPrimary === true) {
     await Contact.updateMany(
       { userId, _id: { $ne: contactId } },

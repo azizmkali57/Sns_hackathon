@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-// import { getServerSession } from "next-auth";
-// import { authOptions } from "@/app/auth/[...nextauth]/route.js";
 import NavigationSession from "@/Models/NavigationSession.js";
 import { clearTracking } from "@/services/trackingService.js";
 import { routeLength, geojsonToLatLng } from "@/lib/mapUtils.js";
