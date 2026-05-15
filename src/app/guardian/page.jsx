@@ -1,6 +1,6 @@
 "use client";
 
-import SOSButton from "@/components/home/SOSButton";
+import SOSButton from "@/components/Home/SOSButton";
 import { useState, useEffect, useRef, useCallback } from "react";
 import emailjs from "@emailjs/browser";
 import {
