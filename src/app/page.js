@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
-import RouteCard from "@/components/home/RouteCard";
+import RouteCard from "@/components/Home/RouteCard";
 import Footer from "@/components/layout/Footer";
 
 import {
@@ -13,7 +13,7 @@ import {
 import { MdSecurity } from "react-icons/md";
 import SOSButton from "@/components/Home/SOSButton";
 
-const MapView = dynamic(() => import("@/components/home/MapView"), { ssr: false });
+const MapView = dynamic(() => import("@/components/Home/MapView"), { ssr: false });
 
 const ROUTES = [
   {
