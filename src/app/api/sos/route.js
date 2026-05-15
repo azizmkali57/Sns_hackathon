@@ -1,11 +1,13 @@
-import { NextResponse }  from "next/server";
-import connectDB         from "@/lib/connectDB";
-import SOS               from "@/Models/SOS";
-import User              from "@/Models/User";
-import Contact           from "@/Models/contact";
-import Tracking          from "@/Models/Tracking";
-import { sendSOSAlert }  from "@/lib/twilio";
-import { verifyAuth }    from "@/lib/auth";
+// app/api/sos/route.js
+
+import { NextResponse } from "next/server";
+import connectDB        from "@/lib/connectDB";
+import SOS              from "@/Models/SOS";
+import User             from "@/Models/User";
+import Contact          from "@/Models/contact";
+import Tracking         from "@/Models/Tracking";
+import { sendSOSAlert } from "@/lib/twilio";
+import { verifyAuth }   from "@/lib/auth";
 
 export async function POST(req) {
   try {
@@ -20,27 +22,26 @@ export async function POST(req) {
     const userId = auth.user.id;
     await connectDB();
 
+    // ── Location ───────────────────────────────────────────────────────────
     const body = await req.json().catch(() => ({}));
     let { lat, lng } = body;
 
     if (lat == null || lng == null) {
       const tracking = await Tracking.findOne({ userId }).lean();
-      if (!tracking?.liveLocation) {
-        return NextResponse.json(
-          { success: false, error: "No location available. Please enable location sharing." },
-          { status: 400 }
-        );
+      if (tracking?.liveLocation?.lat != null) {
+        lat = tracking.liveLocation.lat;
+        lng = tracking.liveLocation.lng;
+      } else {
+        lat = 0; lng = 0;
       }
-      lat = tracking.liveLocation.lat;
-      lng = tracking.liveLocation.lng;
     }
 
+    console.log(`[SOS] userId:${userId} lat:${lat} lng:${lng}`);
+
+    // ── User & contacts ────────────────────────────────────────────────────
     const user = await User.findById(userId).lean();
     if (!user) {
-      return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
     const contacts = await Contact.find({ userId }).lean();
@@ -51,26 +52,50 @@ export async function POST(req) {
       );
     }
 
-    const trackingLink = `https://www.google.com/maps?q=${lat},${lng}`;
+    const hasRealLocation = lat !== 0 && lng !== 0;
+    const trackingLink    = hasRealLocation
+      ? `https://www.google.com/maps?q=${lat},${lng}`
+      : "Location unavailable at time of SOS";
 
+    // ── Blast SOS ──────────────────────────────────────────────────────────
     const deliveryResults = await Promise.all(
       contacts.map(async (c) => {
-        const result = await sendSOSAlert(c.phone, user.name, { lat, lng }, trackingLink);
+        let phone = c.phone?.trim() ?? "";
+        if (phone && !phone.startsWith("+")) phone = "+" + phone.replace(/^0+/, "");
+
+        // SMS works once twilioVerified = true (number in Twilio verified list)
+        // WhatsApp works if sandboxJoined = true
+        console.log(`[SOS] → ${c.name} (${phone}) verified:${c.twilioVerified} sandbox:${c.sandboxJoined}`);
+
+        const result = await sendSOSAlert(
+          phone,
+          user.name,
+          { lat, lng },
+          trackingLink,
+          c.sandboxJoined ?? false
+        );
+
+        console.log(`[SOS] ${c.name}: SMS=${result.smsSent} WA=${result.whatsappSent}`,
+          result.smsError ?? "", result.whatsappError ?? "");
+
         return {
-          contactId:    c._id.toString(),
-          contactName:  c.name,
-          phone:        c.phone,
-          smsSent:      result.smsSent,
-          whatsappSent: result.whatsappSent,
-          smsError:     result.smsError     ?? null,
-          whatsappError: result.whatsappError ?? null,
+          contactId:      c._id.toString(),
+          contactName:    c.name,
+          phone,
+          twilioVerified: c.twilioVerified ?? false,
+          sandboxJoined:  c.sandboxJoined  ?? false,
+          smsSent:        result.smsSent,
+          whatsappSent:   result.whatsappSent,
+          smsError:       result.smsError      ?? null,
+          whatsappError:  result.whatsappError ?? null,
         };
       })
     );
 
+    // ── Persist ────────────────────────────────────────────────────────────
     const sosRecord = await SOS.create({
       userId,
-      location:        { lat, lng },
+      location:         { lat, lng },
       trackingLink,
       contactsNotified: deliveryResults.map((r) => ({
         contactId:    r.contactId,
@@ -81,24 +106,24 @@ export async function POST(req) {
       triggeredAt: new Date(),
     });
 
-    const anySuccess = deliveryResults.some((r) => r.smsSent || r.whatsappSent);
+    const smsCount = deliveryResults.filter((r) => r.smsSent).length;
+    const waCount  = deliveryResults.filter((r) => r.whatsappSent).length;
 
-    return NextResponse.json(
-      {
-        success:  true,
-        sosId:    sosRecord._id,
-        location: { lat, lng },
-        results:  deliveryResults,
-        message:  anySuccess
-          ? `SOS sent to ${deliveryResults.length} contact(s)`
-          : "SOS recorded but message delivery failed — check Twilio credentials",
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success:  true,
+      sosId:    sosRecord._id,
+      location: { lat, lng },
+      results:  deliveryResults,
+      summary:  { total: deliveryResults.length, smsSent: smsCount, whatsappSent: waCount },
+      message:  smsCount > 0
+        ? `SOS SMS sent to ${smsCount} contact(s)${waCount > 0 ? `, WhatsApp to ${waCount}` : ""}`
+        : "SOS recorded — SMS failed. Ensure contacts are Twilio-verified.",
+    }, { status: 200 });
+
   } catch (err) {
-    console.error("[POST /api/sos]", err);
+    console.error("[POST /api/sos] FATAL:", err);
     return NextResponse.json(
-      { success: false, error: "SOS failed — internal server error" },
+      { success: false, error: err.message || "SOS failed" },
       { status: 500 }
     );
   }
@@ -108,25 +133,13 @@ export async function GET(req) {
   try {
     const auth = await verifyAuth(req);
     if (!auth.success || !auth.user?.id) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-
     await connectDB();
-
     const history = await SOS.find({ userId: auth.user.id })
-      .sort({ triggeredAt: -1 })
-      .limit(10)
-      .lean();
-
+      .sort({ triggeredAt: -1 }).limit(10).lean();
     return NextResponse.json({ success: true, data: history }, { status: 200 });
   } catch (err) {
-    console.error("[GET /api/sos]", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch SOS history" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to fetch SOS history" }, { status: 500 });
   }
 }
