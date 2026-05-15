@@ -1,12 +1,11 @@
 // app/api/sos/route.js
-
 import { NextResponse } from "next/server";
+import { randomUUID }   from "crypto";
 import connectDB        from "@/lib/connectDB";
 import SOS              from "@/Models/SOS";
 import User             from "@/Models/User";
 import Contact          from "@/Models/contact";
 import Tracking         from "@/Models/Tracking";
-import { sendSOSAlert } from "@/lib/twilio";
 import { verifyAuth }   from "@/lib/auth";
 
 export async function POST(req) {
@@ -22,7 +21,7 @@ export async function POST(req) {
     const userId = auth.user.id;
     await connectDB();
 
-    // ── Location ───────────────────────────────────────────────────────────
+    // ── Location ──────────────────────────────────────────────────────────
     const body = await req.json().catch(() => ({}));
     let { lat, lng } = body;
 
@@ -36,14 +35,13 @@ export async function POST(req) {
       }
     }
 
-    console.log(`[SOS] userId:${userId} lat:${lat} lng:${lng}`);
-
-    // ── User & contacts ────────────────────────────────────────────────────
+    // ── User ──────────────────────────────────────────────────────────────
     const user = await User.findById(userId).lean();
     if (!user) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
+    // ── Contacts ──────────────────────────────────────────────────────────
     const contacts = await Contact.find({ userId }).lean();
     if (!contacts.length) {
       return NextResponse.json(
@@ -53,71 +51,55 @@ export async function POST(req) {
     }
 
     const hasRealLocation = lat !== 0 && lng !== 0;
-    const trackingLink    = hasRealLocation
+
+    // ── Generate unique tracking token (live link) ────────────────────────
+    const trackingToken   = randomUUID();
+    const expiresAt       = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6 hours
+    const baseUrl         = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const liveTrackingUrl = `${baseUrl}/track/${trackingToken}`;
+
+    // Static snapshot as fallback (opens Google Maps immediately)
+    const snapshotLink = hasRealLocation
       ? `https://www.google.com/maps?q=${lat},${lng}`
-      : "Location unavailable at time of SOS";
+      : null;
 
-    // ── Blast SOS ──────────────────────────────────────────────────────────
-    const deliveryResults = await Promise.all(
-      contacts.map(async (c) => {
-        let phone = c.phone?.trim() ?? "";
-        if (phone && !phone.startsWith("+")) phone = "+" + phone.replace(/^0+/, "");
-
-        // SMS works once twilioVerified = true (number in Twilio verified list)
-        // WhatsApp works if sandboxJoined = true
-        console.log(`[SOS] → ${c.name} (${phone}) verified:${c.twilioVerified} sandbox:${c.sandboxJoined}`);
-
-        const result = await sendSOSAlert(
-          phone,
-          user.name,
-          { lat, lng },
-          trackingLink,
-          c.sandboxJoined ?? false
-        );
-
-        console.log(`[SOS] ${c.name}: SMS=${result.smsSent} WA=${result.whatsappSent}`,
-          result.smsError ?? "", result.whatsappError ?? "");
-
-        return {
-          contactId:      c._id.toString(),
-          contactName:    c.name,
-          phone,
-          twilioVerified: c.twilioVerified ?? false,
-          sandboxJoined:  c.sandboxJoined  ?? false,
-          smsSent:        result.smsSent,
-          whatsappSent:   result.whatsappSent,
-          smsError:       result.smsError      ?? null,
-          whatsappError:  result.whatsappError ?? null,
-        };
-      })
-    );
-
-    // ── Persist ────────────────────────────────────────────────────────────
+    // ── Persist SOS record ────────────────────────────────────────────────
     const sosRecord = await SOS.create({
       userId,
       location:         { lat, lng },
-      trackingLink,
-      contactsNotified: deliveryResults.map((r) => ({
-        contactId:    r.contactId,
-        phone:        r.phone,
-        smsSent:      r.smsSent,
-        whatsappSent: r.whatsappSent,
+      trackingToken,
+      liveTrackingUrl,
+      trackingLink:     snapshotLink ?? "unavailable",
+      expiresAt,
+      active:           true,
+      contactsNotified: contacts.map((c) => ({
+        contactId:    c._id,
+        phone:        c.phone,
+        smsSent:      false,
+        whatsappSent: false,
       })),
       triggeredAt: new Date(),
     });
 
-    const smsCount = deliveryResults.filter((r) => r.smsSent).length;
-    const waCount  = deliveryResults.filter((r) => r.whatsappSent).length;
-
+    // ── Return everything frontend needs ──────────────────────────────────
     return NextResponse.json({
-      success:  true,
-      sosId:    sosRecord._id,
-      location: { lat, lng },
-      results:  deliveryResults,
-      summary:  { total: deliveryResults.length, smsSent: smsCount, whatsappSent: waCount },
-      message:  smsCount > 0
-        ? `SOS SMS sent to ${smsCount} contact(s)${waCount > 0 ? `, WhatsApp to ${waCount}` : ""}`
-        : "SOS recorded — SMS failed. Ensure contacts are Twilio-verified.",
+      success:         true,
+      sosId:           sosRecord._id,
+      userName:        user.name,
+      userPhone:       user.phone ?? null,
+      location:        { lat, lng },
+      trackingToken,
+      liveTrackingUrl, // ← share THIS link in WhatsApp / email
+      snapshotLink,    // ← fallback static map link
+      expiresAt,
+      triggeredAt:     sosRecord.triggeredAt,
+      contacts:        contacts.map((c) => ({
+        id:       c._id,
+        name:     c.name,
+        phone:    c.phone,
+        email:    c.email ?? null,
+        relation: c.relation,
+      })),
     }, { status: 200 });
 
   } catch (err) {

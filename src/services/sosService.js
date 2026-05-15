@@ -2,7 +2,7 @@ import connectDB         from "@/lib/connectDB.js";
 import SOS               from "@/Models/SOS.js";
 import Contact           from "@/Models/contact.js";
 import NavigationSession from "@/Models/NavigationSession.js";
-import { sendSOSAlert }  from "@/lib/twilio.js";
+// import { sendSOSAlert }  from "@/lib/twilio.js";
 
 async function reverseGeocode(lat, lng) {
   try {

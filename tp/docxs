@@ -19,6 +19,8 @@ sns/
         report/page.jsx
 
         api/
+            track/
+                 [token]/route.js
             auth/
                 login/route.js
                 register/route.js
@@ -49,7 +51,11 @@ sns/
 
             navigation/
                start/route.js
-               stop/route.js  
+               stop/route.js 
+
+            track/
+                 [token]/page.jsx
+                       
 
         layout.js
         page.js
@@ -89,13 +95,13 @@ sns/
          scoring.js
          mapUtils.js
          routeAnalyzer.js
-         twilio.js 
 
     services/
          routeService.js
          alertService.js
          sosService.js
          contactService.js
+         riskAnalysisService.js
 
     .env.local
     package.json

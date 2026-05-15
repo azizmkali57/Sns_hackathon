@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AlertPopup    from "@/components/Home/AlertPopup";
 import MapView       from "@/components/Home/MapView";
@@ -75,6 +75,17 @@ export default function DashboardPage() {
       setAlerts((a) => [...a, { id: Date.now(), type: "danger", title: "SOS Triggered", message: "Emergency contacts notified." }]);
     } catch (_) {}
   }, [userLocation]);
+
+  // Add this to your dashboard/page.jsx — inside useEffect on mount
+useEffect(() => {
+  // Pre-request GPS permission so it's ready when SOS is pressed
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      () => {},    // success — permission granted, do nothing
+      () => {}     // error — user denied, we'll handle at SOS time
+    );
+  }
+}, []);
 
   return (
     <>

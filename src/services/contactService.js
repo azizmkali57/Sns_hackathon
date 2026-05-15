@@ -1,6 +1,7 @@
-import connectDB                  from "@/lib/connectDB";
-import Contact                    from "@/Models/contact";
-import { addToVerifiedCallerIds } from "@/lib/twilio";  
+// services/contactService.js
+
+import connectDB from "@/lib/connectDB";
+import Contact   from "@/Models/contact";
 
 const ALLOWED_RELATIONS = [
   "Mother", "Father", "Sister", "Brother",
@@ -13,16 +14,16 @@ function validatePhone(phone) {
 
 function normalisePhone(phone) {
   const p = phone?.trim() ?? "";
-  if (/^\d{10}$/.test(p))  return "+91" + p;           // 9876543210   → +919876543210
-  if (/^0\d{10}$/.test(p)) return "+91" + p.slice(1);  // 09876543210  → +919876543210
-  return p;                                              // already E.164 or other
+  if (/^\d{10}$/.test(p))  return "+91" + p;
+  if (/^0\d{10}$/.test(p)) return "+91" + p.slice(1);
+  return p;
 }
 
 const MAX_CONTACTS = 5;
 
 // ─── addContact ───────────────────────────────────────────────────────────────
 
-export async function addContact(userId, { name, phone, relation, isPrimary = false }, userName = "") {
+export async function addContact(userId, { name, phone, email = null, relation, isPrimary = false }) {
   await connectDB();
 
   if (!name?.trim())     throw new Error("Name is required");
@@ -30,7 +31,6 @@ export async function addContact(userId, { name, phone, relation, isPrimary = fa
   if (!relation?.trim()) throw new Error("Relation is required");
 
   const normalisedPhone = normalisePhone(phone);
-
   if (!validatePhone(normalisedPhone)) {
     throw new Error("Phone must be in E.164 format (e.g. +919876543210 or plain 10 digits)");
   }
@@ -48,35 +48,14 @@ export async function addContact(userId, { name, phone, relation, isPrimary = fa
     await Contact.updateMany({ userId }, { $set: { isPrimary: false } });
   }
 
-  // ── Save contact first ─────────────────────────────────────────────────────
   const contact = await Contact.create({
     userId,
-    name:                     name.trim(),
-    phone:                    normalisedPhone,
-    relation:                 relation.trim(),
-    isPrimary:                !!isPrimary,
-    twilioVerified:           false,
-    twilioValidationCode:     null,
-    twilioVerificationSentAt: null,
-    sandboxJoined:            false,
-    sandboxInviteSentAt:      null,
+    name:      name.trim(),
+    phone:     normalisedPhone,
+    email:     email?.trim()?.toLowerCase() || null,
+    relation:  relation.trim(),
+    isPrimary: !!isPrimary,
   });
-
-  // ── Trigger Twilio Caller ID verification call (non-blocking) ──────────────
-  // Twilio calls the contact's number and reads out a 6-digit code automatically.
-  // Once they receive it, the user clicks "Mark Verified" on the Guardian page.
-  addToVerifiedCallerIds(normalisedPhone)
-    .then(async (verification) => {
-      if (verification.success) {
-        contact.twilioValidationCode     = verification.validationCode;
-        contact.twilioVerificationSentAt = new Date();
-        await contact.save();
-        console.log(`[contactService] Verification call sent to ${normalisedPhone}, code: ${verification.validationCode}`);
-      } else {
-        console.warn(`[contactService] Verification call failed for ${normalisedPhone}:`, verification.error);
-      }
-    })
-    .catch((err) => console.error("[contactService] addToVerifiedCallerIds error:", err.message));
 
   return contact;
 }
@@ -95,8 +74,8 @@ export async function getContacts(userId) {
 export async function deleteContact(contactId, userId) {
   await connectDB();
   const contact = await Contact.findById(contactId);
-  if (!contact)                                          throw new Error("Contact not found");
-  if (contact.userId.toString() !== userId.toString())   throw new Error("Unauthorized");
+  if (!contact)                                        throw new Error("Contact not found");
+  if (contact.userId.toString() !== userId.toString()) throw new Error("Unauthorized");
   await contact.deleteOne();
   return { deleted: true, contactId };
 }
@@ -106,10 +85,10 @@ export async function deleteContact(contactId, userId) {
 export async function updateContact(contactId, userId, updates) {
   await connectDB();
   const contact = await Contact.findById(contactId);
-  if (!contact)                                          throw new Error("Contact not found");
-  if (contact.userId.toString() !== userId.toString())   throw new Error("Unauthorized");
+  if (!contact)                                        throw new Error("Contact not found");
+  if (contact.userId.toString() !== userId.toString()) throw new Error("Unauthorized");
 
-  const allowed = ["name", "phone", "relation", "isPrimary", "sandboxJoined", "twilioVerified", "twilioValidationCode", "twilioVerificationSentAt"];
+  const allowed = ["name", "phone", "email", "relation", "isPrimary"];
   for (const key of Object.keys(updates)) {
     if (!allowed.includes(key)) throw new Error(`Field '${key}' is not allowed`);
   }
@@ -133,43 +112,6 @@ export async function updateContact(contactId, userId, updates) {
   }
 
   Object.assign(contact, updates);
-  await contact.save();
-  return contact;
-}
-
-// ─── resendVerificationCall ───────────────────────────────────────────────────
-
-export async function resendVerificationCall(contactId, userId) {
-  await connectDB();
-  const contact = await Contact.findById(contactId);
-  if (!contact)                                          throw new Error("Contact not found");
-  if (contact.userId.toString() !== userId.toString())   throw new Error("Unauthorized");
-
-  const verification = await addToVerifiedCallerIds(contact.phone, 0);
-
-  if (verification.success) {
-    contact.twilioValidationCode     = verification.validationCode;
-    contact.twilioVerificationSentAt = new Date();
-    contact.twilioVerified           = false;
-    await contact.save();
-  }
-
-  return {
-    success:             verification.success,
-    error:               verification.error ?? null,
-    twilioValidationCode: verification.validationCode ?? null,
-  };
-}
-
-// ─── markTwilioVerified ───────────────────────────────────────────────────────
-
-export async function markTwilioVerified(contactId, userId) {
-  await connectDB();
-  const contact = await Contact.findById(contactId);
-  if (!contact)                                          throw new Error("Contact not found");
-  if (contact.userId.toString() !== userId.toString())   throw new Error("Unauthorized");
-
-  contact.twilioVerified = true;
   await contact.save();
   return contact;
 }

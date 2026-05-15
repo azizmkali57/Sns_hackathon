@@ -1,15 +1,8 @@
-// app/api/contacts/verify/route.js
-//
-// Called when the contact picks up Twilio's call, hears the code,
-// and the user clicks "Mark as Verified" on the Guardian page.
-// (Twilio verifies automatically once the call completes — 
-//  this route just marks it in our DB so SOS knows it's clear.)
-
 import { NextResponse } from "next/server";
 import { verifyAuth }   from "@/lib/auth";
 import connectDB        from "@/lib/connectDB";
 import Contact          from "@/Models/contact";
-import { addToVerifiedCallerIds } from "@/lib/twilio";
+// import { addToVerifiedCallerIds } from "@/lib/twilio";
 
 // POST /api/contacts/verify
 // Body: { contactId }

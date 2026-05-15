@@ -1,6 +1,8 @@
+// app/api/tracking/update/route.js
 import { NextResponse } from "next/server";
 import connectDB        from "@/lib/connectDB";
 import Tracking         from "@/Models/Tracking";
+import SOS              from "@/Models/SOS";
 import { verifyAuth }   from "@/lib/auth";
 
 export async function POST(req) {
@@ -32,6 +34,7 @@ export async function POST(req) {
 
     await connectDB();
 
+    // ── Update live location in Tracking ─────────────────────────────────
     const tracking = await Tracking.findOneAndUpdate(
       { userId: auth.user.id },
       {
@@ -44,6 +47,19 @@ export async function POST(req) {
         },
       },
       { upsert: true, new: true }
+    );
+
+    // ── Also update the active SOS record's location ──────────────────────
+    // This ensures the /track/:token page always shows current position
+    await SOS.findOneAndUpdate(
+      { userId: auth.user.id, active: true },
+      {
+        $set: {
+          "location.lat": lat,
+          "location.lng": lng,
+          locationUpdatedAt: new Date(),
+        },
+      }
     );
 
     return NextResponse.json(
