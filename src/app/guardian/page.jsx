@@ -1,6 +1,5 @@
 "use client";
 
-import SOSButton from "@/components/Home/SOSButton";
 import { useState, useEffect, useRef, useCallback } from "react";
 import emailjs from "@emailjs/browser";
 import {
@@ -8,6 +7,7 @@ import {
   MdCheckCircle, MdEmail, MdWhatsapp,
 } from "react-icons/md";
 import { FiRadio } from "react-icons/fi";
+import SOSButton from "@/components/Home/SOSButton";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
