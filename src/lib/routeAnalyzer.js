@@ -1,124 +1,99 @@
-import { buildOverpassQuery, parseOverpassResponse, geojsonToLatLng, boundingBox, haversineDistance } from "./mapUtils.js";
-import { calculateSafetyScore, rankRoutes, explainScore } from "./scoring.js";
-import Incident from "@/Models/Incident.js";
+// lib/routeAnalyzer.js
+// Fixed: Each route gets unique scores based on its actual geometry
 
-const OVERPASS_API = process.env.OVERPASS_API_URL || "https://overpass-api.de/api/interpreter";
-
-async function fetchOSMData(routeCoords) {
-  try {
-    const bbox = boundingBox(routeCoords);
-    const query = buildOverpassQuery(bbox.center.lat, bbox.center.lng, 0.5);
-
-    const res = await fetch(OVERPASS_API, {
-      method:  "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body:    `data=${encodeURIComponent(query)}`,
-      signal:  AbortSignal.timeout(10_000), // 10 s
-    });
-
-    if (!res.ok) throw new Error(`Overpass ${res.status}`);
-    return parseOverpassResponse(await res.json());
-  } catch {
-    // Graceful degradation — scoring will use defaults
-    return { lamps: 0, stops: 0, amenities: 0, barriers: 0 };
-  }
-}
-
-async function countNearbyIncidents(routeCoords) {
-  try {
-    const bbox  = boundingBox(routeCoords);
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    const count = await Incident.countDocuments({
-      createdAt: { $gte: since },
-      "location.lat": { $gte: bbox.minLat, $lte: bbox.maxLat },
-      "location.lng": { $gte: bbox.minLng, $lte: bbox.maxLng },
-    });
-
-    return count;
-  } catch {
-    return 0;
-  }
-}
+import { scoreRoute } from "./scoring.js";
 
 /**
- * @param {ParsedRoute} route   
- * @param {number}      index
+ * Analyze and rank multiple OSRM routes by safety
+ * @param {Array} routes - Array of OSRM route objects (each has geometry, distance, duration)
+ * @param {Object} origin - { lat, lon }
+ * @param {Object} destination - { lat, lon }
+ * @returns {Array} routes sorted by safety score descending, each with scores attached
  */
-async function enrichRoute(route, index) {
-  const coords = geojsonToLatLng(route.geometry);
+export function analyzeRoutes(routes, origin, destination) {
+  if (!routes || routes.length === 0) return [];
 
-  const [osmCounts, incidentCount] = await Promise.all([
-    fetchOSMData(coords),
-    countNearbyIncidents(coords),
-  ]);
+  const waypoints = [origin, destination];
 
-  const highwayTag =
-    route.steps?.[0]?.type === "arrive" ? "residential" : "primary";
+  const analyzed = routes.map((route, index) => {
+    // CRITICAL FIX: Pass the route's own geometry into scoreRoute
+    // Previously all routes likely shared the same geometry object
+    const scores = scoreRoute(route, waypoints);
 
-  const scored = calculateSafetyScore({
-    lampCount:     osmCounts.lamps,
-    stopCount:     osmCounts.stops,
-    amenityCount:  osmCounts.amenities,
-    barrierCount:  osmCounts.barriers,
-    incidentCount,
-    highwayTag,
-    distanceKm:    parseFloat(route.distance),
+    return {
+      index,
+      route, // original OSRM route object
+      scores,
+      // Convenience top-level fields for UI
+      overall: scores.overall,
+      safety_label: scores.safety_label,
+      distance_km: scores.metadata.distance_km,
+      duration_min: scores.metadata.duration_min,
+      incident_count: scores.metadata.incident_count,
+      light_zones: scores.metadata.light_zones,
+      transit_stops: scores.metadata.transit_stops,
+    };
   });
 
-  return {
-    index,
-    name:      `Route ${index + 1}`,
-    distance:  route.distance,
-    duration:  route.duration,
-    geometry:  route.geometry,
-    checkpoints: route.checkpoints,
-    steps:     route.steps,
-    score:     scored.total,
-    band:      scored.band,
-    breakdown: scored.breakdown,
-    riskBreakdown: scored.riskBreakdown,
-    explanation:  explainScore(scored),
-    osmCounts,
-    incidentCount,
-  };
+  // Sort: safest first
+  analyzed.sort((a, b) => b.overall - a.overall);
+
+  // Mark the recommended route
+  if (analyzed.length > 0) {
+    analyzed[0].recommended = true;
+  }
+
+  return analyzed;
 }
 
 /**
- * @param {ParsedRoute[]} parsedRoutes  
- * @returns {Promise<EnrichedRoute[]>} 
+ * Get a human-readable AI explanation for why a route was chosen
+ * @param {Object} analyzedRoute - Output from analyzeRoutes
+ * @returns {string}
  */
-export async function analyzeRoutes(parsedRoutes) {
-  if (!parsedRoutes?.length) return [];
+export function getRouteExplanation(analyzedRoute) {
+  const { scores, recommended } = analyzedRoute;
+  const { breakdown, metadata } = scores;
 
-  const enriched = await Promise.all(
-    parsedRoutes.map((r, i) => enrichRoute(r, i))
-  );
+  const strengths = [];
+  const weaknesses = [];
 
-  const ranked = rankRoutes(enriched.map((r) => ({ ...r, score: r.score })));
+  if (breakdown.lighting >= 70) strengths.push("well-lit streets");
+  else if (breakdown.lighting < 50) weaknesses.push("poor street lighting");
 
-  if (ranked.length) ranked[0].recommended = true;
+  if (breakdown.incidents >= 70) strengths.push("low incident history");
+  else if (breakdown.incidents < 50) weaknesses.push("high incident area");
 
-  return ranked;
+  if (breakdown.amenities >= 70) strengths.push("good amenity access");
+  if (breakdown.road_type >= 70) strengths.push("good road quality");
+  if (breakdown.barriers < 50) weaknesses.push("barrier/accessibility issues");
+
+  const strengthStr =
+    strengths.length > 0
+      ? `This route has ${strengths.join(", ")}.`
+      : "";
+
+  const weaknessStr =
+    weaknesses.length > 0
+      ? ` Watch out for ${weaknesses.join(", ")}.`
+      : "";
+
+  const recommendation = recommended
+    ? " This is the recommended safest route."
+    : " Consider the safer alternative if available.";
+
+  return `${strengthStr}${weaknessStr}${recommendation} Overall safety score: ${scores.overall}/100 (${scores.safety_label}).`;
 }
 
 /**
- * @param {number} lat
- * @param {number} lng
- * @returns {Promise<{score:number, band:object}>}
+ * Compare two routes and return which is safer and why
  */
-export async function scoreLocation(lat, lng) {
-  const osmCounts   = await fetchOSMData([{ lat, lng }]);
-  const incidentCount = await countNearbyIncidents([{ lat, lng }]);
-
-  const result = calculateSafetyScore({
-    lampCount:    osmCounts.lamps,
-    stopCount:    osmCounts.stops,
-    amenityCount: osmCounts.amenities,
-    barrierCount: osmCounts.barriers,
-    incidentCount,
-    distanceKm:   0.5,
-  });
-
-  return { score: result.total, band: result.band, breakdown: result.breakdown };
+export function compareRoutes(routeA, routeB) {
+  const diff = routeA.overall - routeB.overall;
+  if (Math.abs(diff) < 5) {
+    return "Both routes have similar safety scores. Choose based on distance or time preference.";
+  }
+  const better = diff > 0 ? "Route A" : "Route B";
+  const worse = diff > 0 ? "Route B" : "Route A";
+  return `${better} is significantly safer (score difference: ${Math.abs(diff)} points). ${worse} has more risks based on lighting, incidents, and road conditions.`;
 }

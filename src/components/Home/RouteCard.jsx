@@ -1,171 +1,196 @@
 "use client";
+// components/Home/RouteCard.jsx
+// Fixed: field names now match what /api/routes/create returns
 
-import { MdCheckCircle, MdRadioButtonUnchecked } from "react-icons/md";
-import { FiStar, FiAlertTriangle, FiZap, FiMapPin } from "react-icons/fi";
- 
-const SCORE_COLOR = (s) => s >= 80 ? "#39D353" : s >= 50 ? "#FFC857" : "#FF4D4D";
-const SCORE_LABEL = (s) => s >= 80 ? "Safe"     : s >= 50 ? "Moderate" : "Unsafe";
-const SCORE_BG    = (s) =>
-  s >= 80 ? "rgba(57,211,83,0.08)"  :
-  s >= 50 ? "rgba(255,200,87,0.08)" : "rgba(255,77,77,0.08)";
-const SCORE_GLOW  = (s) =>
-  s >= 80 ? "rgba(57,211,83,0.20)"  :
-  s >= 50 ? "rgba(255,200,87,0.20)" : "rgba(255,77,77,0.20)";
-const BAR_COLOR   = (v) =>
-  v >= 70 ? "#39D353" : v >= 45 ? "#FFC857" : "#FF4D4D";
+import { FiShield, FiAlertTriangle, FiAlertOctagon, FiClock, FiMapPin } from "react-icons/fi";
+import { MdAddRoad, MdBlock, MdDirectionsBus, MdLightbulbOutline, MdStorefront, MdWarningAmber } from "react-icons/md";
+// import {
+//   MdLightbulbOutline, MdDirectionsBus, MdStorefront,
+//   MdRoad, MdBlock, MdWarningAmber,
+// } from "react-icons/md";
 
-const DEFAULT_FACTORS = [
-  { label: "Lighting",  value: 80, weight: 30 },
-  { label: "Transit",   value: 70, weight: 20 },
-  { label: "Amenities", value: 60, weight: 15 },
-  { label: "Road Type", value: 80, weight: 10 },
-  { label: "Barriers",  value: 40, weight: 10 },
-  { label: "Incidents", value: 30, weight: 15 },
+/* ── Safety band helper ─────────────────────────────────────── */
+function band(score) {
+  if (score >= 75) return { label: "SAFE",     color: "#39D353", bg: "rgba(57,211,83,0.08)",   border: "rgba(57,211,83,0.25)",  glow: "rgba(57,211,83,0.18)",  Icon: FiShield        };
+  if (score >= 50) return { label: "MODERATE", color: "#FFC857", bg: "rgba(255,200,87,0.08)",  border: "rgba(255,200,87,0.25)", glow: "rgba(255,200,87,0.18)", Icon: FiAlertTriangle };
+  return             { label: "UNSAFE",   color: "#FF4D4D", bg: "rgba(255,77,77,0.08)",    border: "rgba(255,77,77,0.25)",  glow: "rgba(255,77,77,0.18)",  Icon: FiAlertOctagon  };
+}
+
+const barColor = (v) => v >= 70 ? "#39D353" : v >= 45 ? "#FFC857" : "#FF4D4D";
+
+/* Factor rows shown inside each card */
+const FACTORS = [
+  { key: "lighting",  label: "Lighting",  Icon: MdLightbulbOutline },
+  { key: "transit",   label: "Transit",   Icon: MdDirectionsBus    },
+  { key: "amenities", label: "Amenities", Icon: MdStorefront       },
+  { key: "roadType",  label: "Road Type", Icon: MdAddRoad          },
+  { key: "barriers",  label: "Barriers",  Icon: MdBlock            },
+  { key: "incidents", label: "Incidents", Icon: MdWarningAmber     },
 ];
 
+/* ── Ring SVG ───────────────────────────────────────────────── */
+function Ring({ score, color }) {
+  const r    = 26, sw = 4, dim = 64;
+  const circ = 2 * Math.PI * r;
+  const dash = Math.min(score, 100) / 100 * circ;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: dim, height: dim }}>
+      <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`}
+           style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={dim/2} cy={dim/2} r={r} fill="none"
+                stroke="rgba(255,255,255,0.06)" strokeWidth={sw} />
+        <circle cx={dim/2} cy={dim/2} r={r} fill="none"
+                stroke={color} strokeWidth={sw}
+                strokeDasharray={`${dash} ${circ}`}
+                strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 6px ${color})`, transition: "stroke-dasharray .8s ease" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: "Poppins,sans-serif", fontSize: 15, fontWeight: 700, color, lineHeight: 1 }}>
+          {score}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── RouteCard ──────────────────────────────────────────────── */
 export default function RouteCard({ route, selected, onSelect }) {
-  const color   = SCORE_COLOR(route.score);
-  const label   = SCORE_LABEL(route.score);
-  const factors = route.factors ?? DEFAULT_FACTORS;
- 
-  const CIRC = 138.2;
-  const dash  = (route.score / 100) * CIRC;
+  /*
+   * API shape (from /api/routes/create):
+   *   route.score          → overall safety 0–100
+   *   route.safetyLabel    → "SAFE" | "MODERATE" | "UNSAFE"
+   *   route.distanceKm     → number  e.g. 16.4
+   *   route.durationMin    → number  e.g. 20
+   *   route.breakdown      → { lighting, transit, amenities, roadType, barriers, incidents }
+   *   route.incidentCount  → number
+   *   route.lightZones     → number
+   *   route.transitStops   → number
+   *   route.recommended    → bool
+   */
+  const score    = route.score       ?? 0;
+  const b        = band(score);
+  const dist     = route.distanceKm  != null ? `${Number(route.distanceKm).toFixed(2)} km` : "— km";
+  const dur      = route.durationMin != null ? `${route.durationMin} min`                  : "— min";
+  const breakdown = route.breakdown  ?? {};
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border-[1.5px] p-[18px] cursor-pointer
-                 transition-all duration-200 font-[Inter,sans-serif]
-                 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(0,0,0,.35)]"
-      style={{
-        background:   selected ? SCORE_BG(route.score) : "rgba(255,255,255,0.03)",
-        borderColor:  selected ? color : "rgba(255,255,255,0.07)",
-        boxShadow:    selected ? `0 0 24px ${SCORE_GLOW(route.score)}` : undefined,
-      }}
       onClick={onSelect}
-    > 
+      style={{
+        background:   selected ? b.bg                         : "rgba(255,255,255,0.025)",
+        border:       `1.5px solid ${selected ? b.border : "rgba(255,255,255,0.07)"}`,
+        borderRadius: 16,
+        padding:      "16px",
+        cursor:       "pointer",
+        transition:   "all .2s",
+        boxShadow:    selected ? `0 0 24px ${b.glow}` : "none",
+        fontFamily:   "Inter,sans-serif",
+      }}
+    >
+      {/* ── Header row ─────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+        <Ring score={score} color={b.color} />
 
-      <div className="flex items-center justify-between mb-3.5">
-        <div className="flex items-center gap-3">
-
-          <div className="relative w-[52px] h-[52px] flex-shrink-0">
-            <svg
-              width="52" height="52" viewBox="0 0 52 52"
-              className="absolute top-0 left-0 -rotate-90"
-            >
-              <circle cx="26" cy="26" r="22" fill="none"
-                      stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
-              <circle
-                cx="26" cy="26" r="22" fill="none"
-                stroke={color} strokeWidth="4"
-                strokeDasharray={`${dash} ${CIRC}`}
-                strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center
-                            text-[14px] font-bold font-[Poppins,sans-serif]"
-                 style={{ color }}>
-              {route.score}
-            </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Distance · Duration */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+            <FiMapPin size={11} style={{ color: "rgba(245,247,250,0.35)", flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: "rgba(245,247,250,0.55)", fontWeight: 500 }}>
+              {dist} · {dur}
+            </span>
+            {route.recommended && (
+              <span style={{
+                marginLeft: 4, padding: "1px 7px",
+                background: "rgba(57,211,83,0.12)", border: "1px solid rgba(57,211,83,0.3)",
+                borderRadius: 20, fontSize: 9, fontWeight: 700,
+                color: "#39D353", letterSpacing: "0.1em", textTransform: "uppercase",
+              }}>
+                Best
+              </span>
+            )}
           </div>
 
-          <div>
-            <p className="text-[14px] font-semibold text-[#F5F7FA]
-                          font-[Poppins,sans-serif] mb-0.5">
-              {route.name}
-            </p>
-            <p className="text-[11.5px] text-white/45 flex items-center gap-1">
-              <FiMapPin size={10} />
-              {route.distance} km · {route.duration} min
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-1.5">
-          <span
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full
-                       text-[10px] font-bold tracking-widest uppercase border"
-            style={{ color, background: SCORE_BG(route.score), borderColor: color }}
-          >
-            ● {label}
+          {/* Safety badge */}
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 4,
+            padding: "2px 9px", borderRadius: 20,
+            background: b.bg, border: `1px solid ${b.border}`,
+            color: b.color, fontSize: 9.5, fontWeight: 700,
+            letterSpacing: "0.1em", textTransform: "uppercase",
+          }}>
+            <b.Icon size={9} /> {b.label}
           </span>
-
-          {route.recommended && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-                             text-[9px] font-bold tracking-widest uppercase
-                             text-[#39D353] bg-[#39D353]/10 border border-[#39D353]/30
-                             animate-pulse">
-              <FiStar size={8} /> Best
-            </span>
-          )}
         </div>
-      </div> 
+      </div>
 
-      <div className="h-px bg-white/5 my-3" />
- 
-      <div className="flex flex-col gap-1.5">
-        {factors.map((f) => (
-          <div key={f.label} className="flex items-center gap-2">
-            <span className="text-[10.5px] text-white/45 w-[68px] flex-shrink-0">
-              {f.label}
-            </span>
-            <div className="flex-1 h-1 bg-white/[0.06] rounded-sm overflow-hidden">
-              <div
-                className="h-full rounded-sm transition-all duration-700"
-                style={{
-                  width:      `${f.value}%`,
-                  background: BAR_COLOR(f.value),
-                  opacity:    0.75,
-                }}
-              />
+      {/* ── Factor bars ────────────────────────────────────── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {FACTORS.map(({ key, label, Icon }) => {
+          const val = breakdown[key] ?? 0;
+          return (
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon size={11} style={{ color: "rgba(255,255,255,0.22)", flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: "rgba(245,247,250,0.38)", width: 62, flexShrink: 0 }}>
+                {label}
+              </span>
+              <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{
+                  width: `${val}%`, height: "100%",
+                  background: barColor(val),
+                  borderRadius: 99,
+                  transition: "width .7s ease",
+                  opacity: 0.85,
+                }} />
+              </div>
+              <span style={{ fontSize: 9, color: "rgba(245,247,250,0.28)", width: 20, textAlign: "right" }}>
+                {val}
+              </span>
             </div>
-            <span className="text-[10px] text-white/30 w-6 text-right flex-shrink-0">
-              {f.value}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
- 
-      <div className="grid grid-cols-3 gap-2 mt-3">
+
+      {/* ── Footer chips ───────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 10, marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         {[
-          { icon: <FiAlertTriangle size={10} />, num: route.incidents  ?? 2,    lbl: "Incidents"    },
-          { icon: <FiZap size={10} />,           num: route.lights     ?? "12", lbl: "Light Zones"  },
-          { icon: <FiMapPin size={10} />,        num: route.stops      ?? "4",  lbl: "Transit Stops" },
-        ].map(({ icon, num, lbl }) => (
-          <div key={lbl}
-               className="bg-white/[0.03] border border-white/[0.04] rounded-lg py-2 text-center">
-            <p className="text-[13px] font-semibold text-[#F5F7FA]
-                          font-[Poppins,sans-serif] flex items-center justify-center gap-1">
-              <span className="text-white/30">{icon}</span> {num}
-            </p>
-            <p className="text-[9px] text-white/30 uppercase tracking-widest mt-0.5">{lbl}</p>
+          { label: "INCIDENTS",     value: route.incidentCount ?? "—" },
+          { label: "LIGHT ZONES",   value: route.lightZones    ?? "—" },
+          { label: "TRANSIT STOPS", value: route.transitStops  ?? "—" },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ fontFamily: "Poppins,sans-serif", fontSize: 15, fontWeight: 700, color: "rgba(245,247,250,0.75)" }}>
+              {value}
+            </div>
+            <div style={{ fontSize: 8.5, color: "rgba(245,247,250,0.25)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 1 }}>
+              {label}
+            </div>
           </div>
         ))}
       </div>
- 
-      <button
-        className="mt-3.5 w-full py-2.5 rounded-xl border-[1.5px] text-[12px]
-                   font-bold font-[Poppins,sans-serif] tracking-wider uppercase
-                   cursor-pointer transition-all duration-200 flex items-center
-                   justify-center gap-2"
-        style={{
-          borderColor: color,
-          background:  selected ? color : "transparent",
-          color:       selected ? "#081120" : color,
-        }}
-        onClick={(e) => { e.stopPropagation(); onSelect?.(); }}
-      >
-        {selected
-          ? <><MdCheckCircle size={14} /> Selected Route</>
-          : <><MdRadioButtonUnchecked size={14} /> Select This Route</>
-        }
-      </button>
- 
-      {route.explanation && (
-        <p className="mt-2.5 text-[10.5px] text-white/35 leading-relaxed line-clamp-2">
-          🤖 {route.explanation}
-        </p>
-      )}
+
+      {/* ── Selected / Select button ────────────────────────── */}
+      <div style={{ marginTop: 12 }}>
+        {selected ? (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            padding: "8px", borderRadius: 10,
+            background: b.bg, border: `1px solid ${b.border}`,
+            color: b.color, fontSize: 11.5, fontWeight: 700,
+          }}>
+            ✓ SELECTED ROUTE
+          </div>
+        ) : (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            padding: "8px", borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "rgba(245,247,250,0.45)", fontSize: 11.5, fontWeight: 600,
+          }}>
+            SELECT THIS ROUTE
+          </div>
+        )}
+      </div>
     </div>
   );
 }

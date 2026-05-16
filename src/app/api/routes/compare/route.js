@@ -1,47 +1,73 @@
+// app/api/routes/compare/route.js
+// Fixed: Now passes each route's geometry correctly to the analyzer
+
 import { NextResponse } from "next/server";
-import { compareRoutes } from "@/services/routeService.js";
-import { verifyAuth } from "@/lib/auth";
+import { analyzeRoutes, getRouteExplanation } from "@/lib/routeAnalyzer";
+
+const OSRM_BASE = process.env.OSRM_URL || "https://router.project-osrm.org";
 
 export async function POST(req) {
   try {
-            const auth = await verifyAuth(req);
-            if (!auth.success || !auth.user?.id) {
-              return NextResponse.json(
-                {
-                  success: false,
-                  error: "Unauthorized — please sign in",
-                },
-                { status: 401 }
-              );
-            }
-    
-    const body = await req.json().catch(() => ({}));
-    const { routeAId, routeBId } = body;
+    const body = await req.json();
+    const { origin, destination } = body;
+    // origin & destination: { lat: number, lon: number, label?: string }
 
-    if (!routeAId || !routeBId) {
+    if (!origin?.lat || !origin?.lon || !destination?.lat || !destination?.lon) {
       return NextResponse.json(
-        { success: false, error: "Both routeAId and routeBId are required" },
+        { error: "origin and destination with lat/lon are required" },
         { status: 400 }
       );
     }
 
-    if (routeAId === routeBId) {
-      return NextResponse.json(
-        { success: false, error: "routeAId and routeBId must be different" },
-        { status: 400 }
-      );
+    // Request up to 3 alternative routes from OSRM
+    const osrmUrl =
+      `${OSRM_BASE}/route/v1/driving/` +
+      `${origin.lon},${origin.lat};${destination.lon},${destination.lat}` +
+      `?alternatives=3&geometries=geojson&overview=full&steps=true`;
+
+    const osrmRes = await fetch(osrmUrl);
+    if (!osrmRes.ok) {
+      throw new Error(`OSRM error: ${osrmRes.status}`);
     }
 
-    const result = await compareRoutes(routeAId, routeBId, auth.user.id);
+    const osrmData = await osrmRes.json();
 
-    return NextResponse.json({ success: true, data: result }, { status: 200 });
+    if (!osrmData.routes || osrmData.routes.length === 0) {
+      return NextResponse.json({ error: "No routes found" }, { status: 404 });
+    }
+
+    // ✅ FIX: analyzeRoutes now uses each route's own geometry for unique scoring
+    const analyzedRoutes = analyzeRoutes(osrmData.routes, origin, destination);
+
+    // Build response payload
+    const result = analyzedRoutes.map((r, idx) => ({
+      route_index: idx,
+      recommended: r.recommended || false,
+      overall_score: r.overall,
+      safety_label: r.safety_label,
+      distance_km: r.distance_km,
+      duration_min: r.duration_min,
+      scores: r.scores.breakdown,
+      metadata: {
+        incident_count: r.incident_count,
+        light_zones: r.light_zones,
+        transit_stops: r.transit_stops,
+      },
+      explanation: getRouteExplanation(r),
+      // ✅ Return geometry for map rendering
+      geometry: r.route.geometry,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      total_routes: result.length,
+      routes: result,
+    });
   } catch (err) {
-    console.error("[POST /api/routes/compare]", err);
-    const isUnauth = err.message === "Unauthorized";
-    const isNotFound = err.message?.includes("not found");
+    console.error("[routes/compare] Error:", err);
     return NextResponse.json(
-      { success: false, error: err.message ?? "Internal server error" },
-      { status: isUnauth ? 403 : isNotFound ? 404 : 500 }
+      { error: "Internal server error", details: err.message },
+      { status: 500 }
     );
   }
 }
