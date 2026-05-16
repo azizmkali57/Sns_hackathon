@@ -7,7 +7,7 @@ import MapView       from "@/components/Home/MapView";
 import SOSButton     from "@/components/Home/SOSButton";
 import RouteSelector from "@/components/Home/RouteSelector";
 import { FiShield, FiAlertTriangle, FiUsers, FiPhoneCall } from "react-icons/fi";
-import Header from "@/components/layout/Header"
+// import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 
 const BASE_STATS = [
@@ -89,7 +89,7 @@ useEffect(() => {
 
   return (
     <>
-      <Header />
+      {/* <Header /> */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}

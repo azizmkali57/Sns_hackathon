@@ -6,7 +6,7 @@ import { MdMyLocation } from "react-icons/md";
 import "leaflet/dist/leaflet.css";
 
 const SCORE_COLOR = (s) =>
-  s >= 80 ? "#39D353" : s >= 50 ? "#FFC857" : "#FF4D4D";
+  s >= 80 ? "#16C47F" : s >= 50 ? "#F7C948" : "#FF5A5F";
 
 export default function MapView({
   routes = [],
@@ -18,7 +18,6 @@ export default function MapView({
 }) {
   const mapRef = useRef(null);
 
-  // Leaflet instances
   const mapInstanceRef = useRef(null);
   const polylinesRef = useRef([]);
   const userMarkerRef = useRef(null);
@@ -26,9 +25,6 @@ export default function MapView({
 
   const [ready, setReady] = useState(false);
 
-  // =========================
-  // INITIALIZE MAP
-  // =========================
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!mapRef.current) return;
@@ -36,19 +32,15 @@ export default function MapView({
     let isMounted = true;
 
     const initMap = async () => {
-      // Already initialized
       if (mapInstanceRef.current) return;
 
       const Lmod = await import("leaflet");
       const L = Lmod.default ?? Lmod;
 
-      // HOT RELOAD FIX
-      // Remove existing leaflet container id if present
       if (mapRef.current && mapRef.current._leaflet_id) {
         mapRef.current._leaflet_id = null;
       }
 
-      // Fix marker icons
       delete L.Icon.Default.prototype._getIconUrl;
 
       L.Icon.Default.mergeOptions({
@@ -69,16 +61,15 @@ export default function MapView({
         attributionControl: false,
       });
 
-      // Dark map layer
+      // Light map tile layer
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         {
           subdomains: "abcd",
           maxZoom: 20,
         }
       ).addTo(map);
 
-      // Attribution
       L.control
         .attribution({ prefix: false })
         .addAttribution(
@@ -92,7 +83,6 @@ export default function MapView({
       }
 
       mapInstanceRef.current = map;
-
       setReady(true);
     };
 
@@ -101,38 +91,25 @@ export default function MapView({
     return () => {
       isMounted = false;
 
-      // Remove polylines
       polylinesRef.current.forEach((p) => {
-        try {
-          p.remove();
-        } catch {}
+        try { p.remove(); } catch {}
       });
-
       polylinesRef.current = [];
 
-      // Remove markers
-      try {
-        userMarkerRef.current?.remove();
-      } catch {}
-
-      try {
-        destMarkerRef.current?.remove();
-      } catch {}
+      try { userMarkerRef.current?.remove(); } catch {}
+      try { destMarkerRef.current?.remove(); } catch {}
 
       userMarkerRef.current = null;
       destMarkerRef.current = null;
 
-      // Remove map safely
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.off();
           mapInstanceRef.current.remove();
         } catch {}
-
         mapInstanceRef.current = null;
       }
 
-      // REMOVE LEAFLET ID
       if (mapRef.current && mapRef.current._leaflet_id) {
         mapRef.current._leaflet_id = null;
       }
@@ -141,9 +118,6 @@ export default function MapView({
     };
   }, []);
 
-  // =========================
-  // DRAW ROUTES
-  // =========================
   useEffect(() => {
     if (!ready || !mapInstanceRef.current) return;
 
@@ -152,16 +126,11 @@ export default function MapView({
       const L = Lmod.default ?? Lmod;
 
       const map = mapInstanceRef.current;
-
       if (!map) return;
 
-      // Remove old routes
       polylinesRef.current.forEach((p) => {
-        try {
-          p.remove();
-        } catch {}
+        try { p.remove(); } catch {}
       });
-
       polylinesRef.current = [];
 
       const allLayers = [];
@@ -169,16 +138,9 @@ export default function MapView({
       routes.forEach((route, idx) => {
         let coords = [];
 
-        // GeoJSON format
         if (route.geometry?.coordinates?.length) {
-          coords = route.geometry.coordinates.map(([lng, lat]) => [
-            lat,
-            lng,
-          ]);
-        }
-
-        // Fallback checkpoints
-        else if (route.checkpoints?.length) {
+          coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+        } else if (route.checkpoints?.length) {
           coords = route.checkpoints.map((c) => [c.lat, c.lng]);
         }
 
@@ -187,15 +149,13 @@ export default function MapView({
         const isSelected = idx === selectedRoute;
         const color = SCORE_COLOR(route.score ?? 50);
 
-        // Glow effect
         const glow = L.polyline(coords, {
           color,
           weight: isSelected ? 18 : 0,
-          opacity: 0.12,
+          opacity: 0.10,
           interactive: false,
         }).addTo(map);
 
-        // Main route line
         const line = L.polyline(coords, {
           color,
           weight: isSelected ? 5 : 2.5,
@@ -205,37 +165,20 @@ export default function MapView({
           lineJoin: "round",
         }).addTo(map);
 
-        // Click route
-        line.on("click", () => {
-          onRouteSelect?.(idx);
-        });
+        line.on("click", () => { onRouteSelect?.(idx); });
 
-        // Tooltip
         line.bindTooltip(
-          `
-            <strong style="font-family:Poppins,sans-serif">
-              Route ${idx + 1}
-            </strong>
-            <br/>
-            Score: <strong>${route.score ?? "—"}/100</strong>
-            <br/>
-            ${route.distance ?? "—"} km · ${route.duration ?? "—"} min
-          `,
-          {
-            sticky: true,
-          }
+          `<strong style="font-family:Poppins,sans-serif">Route ${idx + 1}</strong><br/>Score: <strong>${route.score ?? "—"}/100</strong><br/>${route.distance ?? "—"} km · ${route.duration ?? "—"} min`,
+          { sticky: true }
         );
 
         polylinesRef.current.push(glow, line);
-
         allLayers.push(line);
       });
 
-      // Fit bounds
       if (allLayers.length) {
         try {
           const group = L.featureGroup(allLayers);
-
           if (group.getLayers().length) {
             map.fitBounds(group.getBounds().pad(0.15));
           }
@@ -246,9 +189,6 @@ export default function MapView({
     drawRoutes();
   }, [ready, routes, selectedRoute, onRouteSelect]);
 
-  // =========================
-  // USER MARKER
-  // =========================
   useEffect(() => {
     if (!ready || !mapInstanceRef.current || !userLocation) return;
 
@@ -264,18 +204,11 @@ export default function MapView({
           icon: L.divIcon({
             className: "",
             html: `
-              <div
-                style="
-                  width:16px;
-                  height:16px;
-                  border-radius:50%;
-                  background:#00D1FF;
-                  border:2.5px solid #fff;
-                  box-shadow:
-                    0 0 0 5px rgba(0,209,255,.2),
-                    0 0 14px #00D1FF;
-                "
-              ></div>
+              <div style="
+                width:16px; height:16px; border-radius:50%;
+                background:#0EA5E9; border:2.5px solid #fff;
+                box-shadow: 0 0 0 5px rgba(14,165,233,.2), 0 0 14px #0EA5E9;
+              "></div>
             `,
             iconSize: [16, 16],
             iconAnchor: [8, 8],
@@ -286,21 +219,14 @@ export default function MapView({
         .addTo(mapInstanceRef.current)
         .bindPopup("<strong>You are here</strong>");
 
-      // Auto center if no routes
       if (!routes.length) {
-        mapInstanceRef.current.setView(
-          [userLocation.lat, userLocation.lng],
-          15
-        );
+        mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 15);
       }
     };
 
     drawUser();
   }, [ready, userLocation, routes.length]);
 
-  // =========================
-  // DESTINATION MARKER
-  // =========================
   useEffect(() => {
     if (!ready || !mapInstanceRef.current || !destination) return;
 
@@ -316,16 +242,11 @@ export default function MapView({
           icon: L.divIcon({
             className: "",
             html: `
-              <div
-                style="
-                  width:18px;
-                  height:18px;
-                  border-radius:50%;
-                  background:#39D353;
-                  border:2.5px solid #fff;
-                  box-shadow:0 0 14px #39D353;
-                "
-              ></div>
+              <div style="
+                width:18px; height:18px; border-radius:50%;
+                background:#16C47F; border:2.5px solid #fff;
+                box-shadow:0 0 14px #16C47F;
+              "></div>
             `,
             iconSize: [18, 18],
             iconAnchor: [9, 9],
@@ -333,51 +254,36 @@ export default function MapView({
         }
       )
         .addTo(mapInstanceRef.current)
-        .bindPopup(
-          `<strong>${destination.label ?? "Destination"}</strong>`
-        );
+        .bindPopup(`<strong>${destination.label ?? "Destination"}</strong>`);
     };
 
     drawDestination();
   }, [ready, destination]);
 
-  // =========================
-  // CONTROLS
-  // =========================
-  const zoomIn = () => {
-    mapInstanceRef.current?.zoomIn();
-  };
-
-  const zoomOut = () => {
-    mapInstanceRef.current?.zoomOut();
-  };
-
+  const zoomIn  = () => { mapInstanceRef.current?.zoomIn(); };
+  const zoomOut = () => { mapInstanceRef.current?.zoomOut(); };
   const centerUser = () => {
     if (userLocation && mapInstanceRef.current) {
-      mapInstanceRef.current.setView(
-        [userLocation.lat, userLocation.lng],
-        16
-      );
+      mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 16);
     }
   };
 
   return (
     <div
-      className={`relative w-full rounded-2xl overflow-hidden border border-white/10 ${className}`}
+      className={`relative w-full rounded-2xl overflow-hidden ${className}`}
       style={{
         height: 420,
-        background: "#0a1628",
+        background: "#F4F8FB",
+        border: "1px solid rgba(15,23,42,0.08)",
+        boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
       }}
     >
-      {/* MAP */}
       <div ref={mapRef} className="w-full h-full" />
 
-      {/* LOADER */}
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a1628]">
-          <div className="flex flex-col items-center gap-3 text-white/30">
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#F4F8FB" }}>
+          <div className="flex flex-col items-center gap-3" style={{ color: "#64748B" }}>
             <FiNavigation size={32} className="animate-spin" />
-
             <span className="text-xs font-medium tracking-widest uppercase font-[Inter,sans-serif]">
               Loading map…
             </span>
@@ -386,32 +292,37 @@ export default function MapView({
       )}
 
       {/* LIVE BADGE */}
-      <div className="absolute top-3 left-3 z-[1000] flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#081120]/85 backdrop-blur border border-[#00D1FF]/20 text-[11px] font-medium text-white/60 font-[Inter,sans-serif]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#39D353] shadow-[0_0_6px_#39D353] animate-pulse" />
-
+      <div className="absolute top-3 left-3 z-[1000] flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur text-[11px] font-medium font-[Inter,sans-serif]"
+           style={{ background: "rgba(244,248,251,0.90)", border: "1px solid rgba(14,165,233,0.20)", color: "#64748B" }}>
+        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#16C47F", boxShadow: "0 0 6px #16C47F" }} />
         LIVE MAP — OSM
       </div>
 
       {/* CONTROLS */}
       <div className="absolute right-3 bottom-8 z-[1000] flex flex-col gap-1.5">
-        <button
-          onClick={zoomIn}
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#081120]/85 backdrop-blur border border-white/10 text-white/70 hover:border-[#00D1FF]/50 hover:text-[#00D1FF] transition-all"
-        >
-          <FiZoomIn size={15} />
-        </button>
-
-        <button
-          onClick={zoomOut}
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#081120]/85 backdrop-blur border border-white/10 text-white/70 hover:border-[#00D1FF]/50 hover:text-[#00D1FF] transition-all"
-        >
-          <FiZoomOut size={15} />
-        </button>
+        {[
+          { action: zoomIn,    Icon: FiZoomIn   },
+          { action: zoomOut,   Icon: FiZoomOut  },
+        ].map(({ action, Icon }, i) => (
+          <button
+            key={i}
+            onClick={action}
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"
+            style={{ background: "rgba(244,248,251,0.90)", border: "1px solid rgba(15,23,42,0.10)", color: "#64748B" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(14,165,233,0.40)"; e.currentTarget.style.color = "#0EA5E9"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(15,23,42,0.10)"; e.currentTarget.style.color = "#64748B"; }}
+          >
+            <Icon size={15} />
+          </button>
+        ))}
 
         {userLocation && (
           <button
             onClick={centerUser}
-            className="w-8 h-8 flex items-center justify-center rounded-lg mt-1 bg-[#081120]/85 backdrop-blur border border-[#00D1FF]/30 text-[#00D1FF] hover:bg-[#00D1FF]/10 transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-lg mt-1 transition-all"
+            style={{ background: "rgba(244,248,251,0.90)", border: "1px solid rgba(14,165,233,0.30)", color: "#0EA5E9" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(14,165,233,0.10)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(244,248,251,0.90)"; }}
           >
             <MdMyLocation size={15} />
           </button>
@@ -419,7 +330,7 @@ export default function MapView({
       </div>
 
       {/* FOOTER */}
-      <div className="absolute bottom-2 left-3 z-[1000] text-[9px] text-white/20 font-[Inter,sans-serif]">
+      <div className="absolute bottom-2 left-3 z-[1000] text-[9px] font-[Inter,sans-serif]" style={{ color: "rgba(15,23,42,0.30)" }}>
         © OpenStreetMap · OSRM · CartoDB
       </div>
     </div>
