@@ -497,16 +497,16 @@ export default function GuardianPage() {
 
                 <input required placeholder="Full name" value={addForm.name}
                   onChange={(e) => setAddForm(f=>({...f,name:e.target.value}))}
-                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-black placeholder-black outline-none focus:border-[#00D1FF]/40 transition-colors"/>
+                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-white placeholder-white outline-none focus:border-[#00D1FF]/40 transition-colors"/>
 
                 <input required placeholder="Phone — 9876543210 or +919876543210" value={addForm.phone}
                   onChange={(e) => setAddForm(f=>({...f,phone:e.target.value.trim()}))}
-                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-black placeholder-black outline-none focus:border-[#00D1FF]/40 transition-colors"/>
+                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-white placeholder-white outline-none focus:border-[#00D1FF]/40 transition-colors"/>
 
                 <input placeholder="Email (optional — for backup alert)" value={addForm.email}
                   onChange={(e) => setAddForm(f=>({...f,email:e.target.value.trim()}))}
                   type="email"
-                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-black placeholder-black outline-none focus:border-[#00D1FF]/40 transition-colors"/>
+                  className="w-full bg-white/4 border border-white/8 rounded-lg px-3 py-2 text-[12px] text-white placeholder-white outline-none focus:border-[#00D1FF]/40 transition-colors"/>
 
                 <select value={addForm.relation} onChange={(e) => setAddForm(f=>({...f,relation:e.target.value}))}
                   className="w-full bg-[#0a1628] border border-white/8 rounded-lg px-3 py-2 text-[12px] text-white/80 outline-none focus:border-[#00D1FF]/40 cursor-pointer">

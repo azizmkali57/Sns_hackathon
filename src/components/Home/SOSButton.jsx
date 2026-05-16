@@ -1,314 +1,363 @@
 "use client";
-// components/home/SOSButton.jsx
-import { useState, useRef, useEffect, useCallback } from "react";
-import { MdLocationOn, MdClose }                    from "react-icons/md";
-import { FiAlertOctagon }                           from "react-icons/fi";
+// components/Home/SOSButton.jsx
+// Auto-sends WhatsApp message to every guardian when SOS is triggered
 
-const HOLD_MS            = 3000;
-const LOCATION_POLL_MS   = 10_000; // push location every 10 s while SOS is active
+import { useState, useEffect, useRef, useCallback } from "react";
 
-export default function SOSButton({ onSOS, compact = false }) {
-  const [holding,   setHolding]   = useState(false);
-  const [progress,  setProgress]  = useState(0);
-  const [activated, setActivated] = useState(false);
-  const [countdown, setCountdown] = useState(null);
-  const [sosData,   setSosData]   = useState(null);  // returned by /api/sos
-  const [locError,  setLocError]  = useState(null);
+const LOCATION_OPTS   = { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 };
+const UPDATE_INTERVAL = 10_000;
 
-  const intervalRef    = useRef(null);   // hold-progress timer
-  const startRef       = useRef(null);
-  const locationPollRef = useRef(null);  // live-location push timer
+function buildSOSMessage({ userName, liveUrl, snapshotLink, triggeredAt }) {
+  const time = new Date(triggeredAt).toLocaleTimeString();
+  return [
+    `🆘 SOS ALERT — ${userName} needs help!`,
+    ``,
+    `📍 Live location (updates every 10s):`,
+    liveUrl,
+    ``,
+    snapshotLink ? `🗺️ Current snapshot: ${snapshotLink}` : ``,
+    `🕐 Time: ${time}`,
+    `📞 Call them immediately!`,
+  ].filter(Boolean).join("\n").trim();
+}
 
-  // ── Get current GPS position (promise wrapper) ──────────────────────────
-  const getCurrentPosition = () =>
-    new Promise((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout:            8000,
-      })
-    );
+function openWhatsApp(phone, message) {
+  const clean = phone.replace(/[\s\-().+]/g, "");
+  // ensure country code — if number doesn't start with country code add 91 (India)
+  const normalized = clean.startsWith("91") || clean.length > 10 ? clean : `91${clean}`;
+  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
-  // ── Push location update to server ──────────────────────────────────────
-  const pushLocation = useCallback(async () => {
-    if (!navigator.geolocation) return;
+export default function SOSButton({ onSOS }) {
+  const [phase,     setPhase]     = useState("idle"); // idle|confirm|triggering|active|error
+  const [liveUrl,   setLiveUrl]   = useState(null);
+  const [contacts,  setContacts]  = useState([]);
+  const [errorMsg,  setErrorMsg]  = useState(null);
+  const [countdown, setCountdown] = useState(3);
+  const [location,  setLocation]  = useState(null);
+  const [sentCount, setSentCount] = useState(0);
+  const [sosData,   setSosData]   = useState(null);
+
+  const intervalRef  = useRef(null);
+  const countdownRef = useRef(null);
+
+  // ── Push GPS to server every 10s ──────────────────────────────────────
+  const pushGPS = useCallback(async (lat, lng) => {
     try {
-      const pos = await getCurrentPosition();
       await fetch("/api/tracking/update", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          lat:      pos.coords.latitude,
-          lng:      pos.coords.longitude,
-          speedKmh: pos.coords.speed ? pos.coords.speed * 3.6 : 0,
-          heading:  pos.coords.heading ?? 0,
-        }),
+        body: JSON.stringify({ lat, lng }),
       });
-    } catch {
-      // Silently skip — location might be temporarily unavailable
-    }
+    } catch {}
   }, []);
 
-  // ── Trigger SOS ──────────────────────────────────────────────────────────
+  const startLiveTracking = useCallback(() => {
+    if (!navigator.geolocation) return;
+    const push = () => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          setLocation({ lat: coords.latitude, lng: coords.longitude });
+          pushGPS(coords.latitude, coords.longitude);
+        },
+        () => {},
+        LOCATION_OPTS
+      );
+    };
+    push();
+    intervalRef.current = setInterval(push, UPDATE_INTERVAL);
+  }, [pushGPS]);
+
+  const stopLiveTracking = useCallback(() => {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
+
+  // ── Main SOS trigger ──────────────────────────────────────────────────
   const triggerSOS = useCallback(async () => {
-    setActivated(true);
-    setHolding(false);
-    setProgress(100);
-    setCountdown(0);
+    setPhase("triggering");
+    setSentCount(0);
+
+    // 1. Get GPS
+    let lat = 0, lng = 0;
+    try {
+      await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => { lat = coords.latitude; lng = coords.longitude; resolve(); },
+          resolve,
+          LOCATION_OPTS
+        );
+      });
+    } catch {}
 
     try {
-      // 1. Get initial GPS
-      let lat = 0, lng = 0;
-      try {
-        const pos = await getCurrentPosition();
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
-      } catch {
-        setLocError("Location unavailable — sending without GPS");
-      }
-
-      // 2. Hit our SOS API
+      // 2. Create SOS record on server
       const res  = await fetch("/api/sos", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ lat, lng }),
+        body: JSON.stringify({ lat, lng }),
       });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error ?? "SOS failed");
 
-      setSosData(json);
+      const guardians = data.contacts ?? [];
+      setSosData(data);
+      setLiveUrl(data.liveTrackingUrl);
+      setContacts(guardians);
+      setPhase("active");
+      startLiveTracking();
+      onSOS?.({ lat, lng, liveUrl: data.liveTrackingUrl });
 
-      // 3. Open WhatsApp for each contact
-      const msg = buildWhatsAppMessage(json);
-      json.contacts.forEach((contact, i) => {
-        const phone = contact.phone.replace(/\D/g, "");
-        const url   = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-        // Stagger so browser doesn't block popups
-        setTimeout(() => window.open(url, "_blank"), i * 800);
+      // 3. Build message once
+      const message = buildSOSMessage({
+        userName:    data.userName,
+        liveUrl:     data.liveTrackingUrl,
+        snapshotLink: data.snapshotLink,
+        triggeredAt: data.triggeredAt ?? new Date().toISOString(),
       });
 
-      // 4. Send EmailJS backup (fire and forget)
-      sendEmailJS(json).catch(console.error);
-
-      // 5. Start pushing live location every 10 s
-      locationPollRef.current = setInterval(pushLocation, LOCATION_POLL_MS);
-
-      if (onSOS) onSOS(json);
-
-    } catch (err) {
-      console.error("[SOSButton] trigger error:", err);
-      setLocError(err.message || "SOS failed — try again");
-      setActivated(false);
-    }
-  }, [onSOS, pushLocation]);
-
-  // ── Hold-press logic ─────────────────────────────────────────────────────
-  const startHold = () => {
-    if (activated) return;
-    setHolding(true);
-    startRef.current = Date.now();
-    intervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startRef.current;
-      const pct     = Math.min((elapsed / HOLD_MS) * 100, 100);
-      const secs    = Math.ceil((HOLD_MS - elapsed) / 1000);
-      setProgress(pct);
-      setCountdown(secs > 0 ? secs : 0);
-      if (elapsed >= HOLD_MS) {
-        clearInterval(intervalRef.current);
-        triggerSOS();
+      // 4. Open WhatsApp for each guardian with 1.5s gap
+      //    (browsers require user gesture + small delay between window.open calls)
+      let sent = 0;
+      for (let i = 0; i < guardians.length; i++) {
+        if (!guardians[i]?.phone) continue;
+        openWhatsApp(guardians[i].phone, message);
+        sent++;
+        setSentCount(sent);
+        if (i < guardians.length - 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
       }
-    }, 50);
-  };
-
-  const endHold = () => {
-    if (activated) return;
-    clearInterval(intervalRef.current);
-    setHolding(false);
-    setProgress(0);
-    setCountdown(null);
-  };
-
-  // ── Reset ────────────────────────────────────────────────────────────────
-  const reset = () => {
-    clearInterval(locationPollRef.current);
-    setActivated(false);
-    setProgress(0);
-    setCountdown(null);
-    setSosData(null);
-    setLocError(null);
-  };
-
-  // ── Cleanup on unmount ───────────────────────────────────────────────────
-  useEffect(() => () => {
-    clearInterval(intervalRef.current);
-    clearInterval(locationPollRef.current);
-  }, []);
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
-  function buildWhatsAppMessage(data) {
-    const time = new Date(data.triggeredAt).toLocaleTimeString();
-    return (
-      `🆘 *SOS ALERT* — ${data.userName} needs help!\n\n` +
-      `📍 *Live location (updates every 10s):*\n${data.liveTrackingUrl}\n\n` +
-      (data.snapshotLink
-        ? `🗺 *Current snapshot:* ${data.snapshotLink}\n\n`
-        : "") +
-      `🕐 Time: ${time}\n` +
-      `📞 Call them immediately!`
-    );
-  }
-
-  async function sendEmailJS(data) {
-    // EmailJS is loaded via CDN in your layout — adjust serviceId / templateId
-    if (typeof emailjs === "undefined") return;
-    const time = new Date(data.triggeredAt).toLocaleTimeString();
-    for (const contact of data.contacts) {
-      if (!contact.email) continue;
-      await emailjs.send(
-        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
-        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
-        {
-          to_email:      contact.email,
-          to_name:       contact.name,
-          user_name:     data.userName,
-          location_link: data.liveTrackingUrl,    // ← LIVE link, not static
-          snapshot_link: data.snapshotLink ?? "unavailable",
-          time,
-        },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
-      );
+    } catch (err) {
+      setErrorMsg(err.message);
+      setPhase("error");
     }
-  }
+  }, [onSOS, startLiveTracking]);
 
-  // ── Sizing ───────────────────────────────────────────────────────────────
-  const SIZE         = compact ? 84  : 148;
-  const RADIUS       = compact ? 40  : 70;
-  const CX           = compact ? 42  : 74;
-  const circumference = 2 * Math.PI * RADIUS;
+  // ── 3-second hold to confirm ──────────────────────────────────────────
+  const startHold = () => {
+    if (phase !== "idle") return;
+    setPhase("confirm");
+    setCountdown(3);
+    countdownRef.current = setInterval(() => {
+      setCountdown((s) => {
+        if (s <= 1) { clearInterval(countdownRef.current); triggerSOS(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  };
 
-  return (
-    <>
-      <style>{`
-        @keyframes sosRingExpand  { 0%{opacity:.6;transform:scale(1)} 100%{opacity:0;transform:scale(1.35)} }
-        @keyframes activatedPulse { 0%{box-shadow:0 0 40px rgba(255,77,77,.6),0 0 80px rgba(255,77,77,.3)} 100%{box-shadow:0 0 70px rgba(255,77,77,.9),0 0 140px rgba(255,77,77,.5)} }
-        @keyframes fadeUp         { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .sos-ring-expand  { animation: sosRingExpand  2s ease-in-out infinite; }
-        .sos-activated    { animation: activatedPulse 0.6s ease-in-out infinite alternate; }
-        .sos-fade-up      { animation: fadeUp 0.4s ease; }
-      `}</style>
+  const cancelHold = () => {
+    if (phase !== "confirm") return;
+    clearInterval(countdownRef.current);
+    setPhase("idle");
+    setCountdown(3);
+  };
 
-      <div className="flex flex-col items-center gap-3.5 select-none">
-        <div className="relative flex items-center justify-center">
+  const resolveSOS = () => {
+    stopLiveTracking();
+    setPhase("idle");
+    setLiveUrl(null); setContacts([]); setLocation(null); setSentCount(0); setSosData(null);
+  };
 
-          {!activated && (
-            <div
-              className="sos-ring-expand absolute rounded-full border-2 border-[#FF4D4D]/15 pointer-events-none"
-              style={{ width: compact ? 104 : 180, height: compact ? 104 : 180 }}
-            />
-          )}
+  const resendToAll = useCallback(async () => {
+    if (!liveUrl || !contacts.length || !sosData) return;
+    const message = buildSOSMessage({
+      userName:    sosData.userName,
+      liveUrl,
+      snapshotLink: location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : null,
+      triggeredAt: new Date().toISOString(),
+    });
+    for (let i = 0; i < contacts.length; i++) {
+      if (!contacts[i]?.phone) continue;
+      openWhatsApp(contacts[i].phone, message);
+      if (i < contacts.length - 1) await new Promise((r) => setTimeout(r, 1500));
+    }
+  }, [liveUrl, contacts, location, sosData]);
 
-          {(holding || activated) && (
-            <svg
-              className="absolute top-0 left-0 pointer-events-none"
-              style={{ transform: "rotate(-90deg)" }}
-              width={SIZE} height={SIZE}
-              viewBox={`0 0 ${SIZE} ${SIZE}`}
-            >
-              <circle cx={CX} cy={CX} r={RADIUS} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={compact ? 3 : 4} />
-              <circle
-                cx={CX} cy={CX} r={RADIUS}
-                fill="none"
-                stroke="#fff"
-                strokeWidth={compact ? 3 : 4}
-                strokeLinecap="round"
-                strokeDasharray={`${(progress / 100) * circumference} ${circumference}`}
-                style={{ filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))" }}
-              />
-            </svg>
-          )}
+  useEffect(() => () => { stopLiveTracking(); clearInterval(countdownRef.current); }, [stopLiveTracking]);
 
-          <button
-            className={`relative z-10 rounded-full border-0 flex flex-col items-center justify-center cursor-pointer transition-all duration-100 ${
-              holding ? "scale-[.97]" : ""
-            } ${activated ? "sos-activated" : ""}`}
-            style={{
-              width:  SIZE,
-              height: SIZE,
-              background: activated
-                ? "radial-gradient(circle at 35% 35%, #ff8c8c, #FF4D4D 40%, #a02020)"
-                : "radial-gradient(circle at 35% 35%, #ff6b6b, #FF4D4D 40%, #c73737)",
-              boxShadow: holding
-                ? "0 0 60px rgba(255,77,77,0.7), 0 0 120px rgba(255,77,77,0.3), inset 0 2px 4px rgba(255,255,255,0.2)"
-                : compact
-                  ? "0 0 24px rgba(255,77,77,0.4), inset 0 1px 2px rgba(255,255,255,0.2)"
-                  : "0 0 40px rgba(255,77,77,0.45), 0 0 80px rgba(255,77,77,0.15), inset 0 2px 4px rgba(255,255,255,0.2)",
-              WebkitTapHighlightColor: "transparent",
-            }}
-            onMouseDown={startHold}
-            onMouseUp={endHold}
-            onMouseLeave={endHold}
-            onTouchStart={startHold}
-            onTouchEnd={endHold}
-          >
-            {holding && countdown !== null ? (
-              <span className="text-[28px] font-bold text-white font-[Poppins,sans-serif] drop-shadow-[0_0_20px_rgba(255,255,255,.5)]">
-                {countdown}
-              </span>
-            ) : (
-              <>
-                <span
-                  className="font-extrabold text-white tracking-widest font-[Poppins,sans-serif] drop-shadow-[0_2px_8px_rgba(0,0,0,.4)] leading-none"
-                  style={{ fontSize: compact ? 18 : 30 }}
-                >
-                  SOS
-                </span>
-                {!compact && (
-                  <span className="text-[9px] font-semibold text-white/65 tracking-[0.18em] uppercase mt-0.5 font-[Inter,sans-serif]">
-                    Emergency
-                  </span>
-                )}
-              </>
-            )}
-          </button>
+  // ── ACTIVE STATE ──────────────────────────────────────────────────────
+  if (phase === "active") return (
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+
+      {/* Banner */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+        borderRadius: 12, background: "rgba(255,40,40,0.1)", border: "1px solid rgba(255,77,77,0.3)",
+      }}>
+        <Blink />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#FF4D4D" }}>SOS ACTIVE</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 1 }}>Live GPS updating every 10s</div>
         </div>
-
-        {!compact && (
-          <>
-            {activated ? (
-              <div className="sos-fade-up flex flex-col items-center gap-2 text-center">
-                <div className="flex items-center gap-2">
-                  <FiAlertOctagon size={16} className="text-[#FF4D4D]" />
-                  <span className="text-[14px] font-bold text-[#FF4D4D] tracking-wider font-[Poppins,sans-serif]">
-                    SOS ACTIVATED
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-[Inter,sans-serif]">
-                  <MdLocationOn size={12} className="text-[#39D353]" />
-                  Live location link sent — updates every 10s
-                </div>
-                {sosData?.liveTrackingUrl && (
-                  <div className="text-[10px] text-white/30 break-all max-w-[220px]">
-                    {sosData.liveTrackingUrl}
-                  </div>
-                )}
-                {locError && (
-                  <div className="text-[10px] text-[#FF4D4D]/70">{locError}</div>
-                )}
-                <p className="text-[11px] text-white/50">Emergency contacts notified via WhatsApp & Email</p>
-                <button
-                  onClick={reset}
-                  className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors bg-transparent border-0 cursor-pointer underline mt-1"
-                >
-                  <MdClose size={11} /> Cancel / Reset
-                </button>
-              </div>
-            ) : (
-              <p className="text-[11.5px] text-white/40 text-center tracking-wide max-w-[160px] leading-relaxed font-[Inter,sans-serif]">
-                {holding ? "Keep holding…" : "Hold 3 seconds to trigger SOS"}
-              </p>
-            )}
-          </>
+        {sentCount > 0 && (
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: "#39D353",
+            background: "rgba(57,211,83,0.1)", border: "1px solid rgba(57,211,83,0.25)",
+            padding: "2px 8px", borderRadius: 20,
+          }}>✓ {sentCount} notified</span>
         )}
       </div>
+
+      {/* Per-contact sent status */}
+      {contacts.length > 0 && (
+        <div style={{
+          padding: "10px 12px", borderRadius: 10,
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+          display: "flex", flexDirection: "column", gap: 7,
+        }}>
+          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            WhatsApp sent to
+          </p>
+          {contacts.map((c, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13 }}>✅</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)" }}>{c.name}</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginLeft: 6 }}>{c.phone}</span>
+              </div>
+              <button
+                onClick={() => {
+                  if (!liveUrl || !sosData) return;
+                  openWhatsApp(c.phone, buildSOSMessage({
+                    userName: sosData.userName, liveUrl,
+                    snapshotLink: location ? `https://www.google.com/maps?q=${location.lat},${location.lng}` : null,
+                    triggeredAt: new Date().toISOString(),
+                  }));
+                }}
+                style={{
+                  fontSize: 10, padding: "2px 8px", borderRadius: 6,
+                  background: "#25D366", border: "none", color: "#fff",
+                  cursor: "pointer", fontWeight: 600,
+                }}
+              >Resend</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Live link */}
+      {liveUrl && (
+        <div style={{
+          padding: "8px 12px", borderRadius: 10,
+          background: "rgba(0,209,255,0.04)", border: "1px solid rgba(0,209,255,0.12)",
+        }}>
+          <p style={{ fontSize: 10, color: "rgba(0,209,255,0.6)", marginBottom: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>Live Tracking Link</p>
+          <p style={{ fontSize: 11, color: "#00D1FF", wordBreak: "break-all", fontFamily: "monospace" }}>{liveUrl}</p>
+          {location && (
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 3 }}>
+              📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={resendToAll} style={{
+          flex: 1, padding: "9px 8px", borderRadius: 10,
+          background: "#25D366", border: "none", color: "#fff",
+          fontWeight: 700, fontSize: 12, cursor: "pointer",
+        }}>📤 Resend to All</button>
+        <button onClick={() => liveUrl && navigator.clipboard?.writeText(liveUrl)} style={{
+          padding: "9px 14px", borderRadius: 10,
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+          color: "rgba(255,255,255,0.5)", fontSize: 12, cursor: "pointer", fontWeight: 600,
+        }}>📋 Copy</button>
+      </div>
+
+      <button onClick={resolveSOS} style={{
+        width: "100%", padding: "9px", borderRadius: 10,
+        background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
+        color: "rgba(255,255,255,0.3)", fontSize: 12, cursor: "pointer",
+      }}>✓ I am safe — Cancel SOS</button>
+    </div>
+  );
+
+  if (phase === "triggering") return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <Spinner />
+      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+        Sending SOS &amp; opening WhatsApp for each contact…
+      </p>
+    </div>
+  );
+
+  if (phase === "error") return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <p style={{ fontSize: 12, color: "#FF4D4D", textAlign: "center" }}>⚠ {errorMsg}</p>
+      <button onClick={() => setPhase("idle")} style={{
+        padding: "8px 20px", borderRadius: 8, background: "#FF4D4D",
+        border: "none", color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer",
+      }}>Retry</button>
+    </div>
+  );
+
+  // ── IDLE / CONFIRM ────────────────────────────────────────────────────
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      {phase === "confirm" && (
+        <p style={{ fontSize: 12, color: "#FF4D4D", fontWeight: 700, textAlign: "center" }}>
+          Sending in {countdown}s…<br />
+          <span style={{ fontSize: 10, fontWeight: 400, color: "rgba(255,255,255,0.35)" }}>Release to cancel</span>
+        </p>
+      )}
+
+      <button
+        onMouseDown={startHold}
+        onMouseUp={cancelHold}
+        onMouseLeave={cancelHold}
+        onTouchStart={(e) => { e.preventDefault(); startHold(); }}
+        onTouchEnd={cancelHold}
+        style={{
+          width: 120, height: 120, borderRadius: "50%",
+          background: phase === "confirm"
+            ? "radial-gradient(circle, #ff2222, #cc0000)"
+            : "radial-gradient(circle, #ff4444, #cc0000)",
+          boxShadow: phase === "confirm"
+            ? "0 0 50px rgba(255,40,40,0.9), 0 0 100px rgba(255,40,40,0.3)"
+            : "0 0 24px rgba(255,77,77,0.4)",
+          border: `4px solid ${phase === "confirm" ? "#ff8888" : "rgba(255,77,77,0.5)"}`,
+          color: "#fff", fontWeight: 900, fontSize: 28,
+          cursor: "pointer", userSelect: "none", WebkitUserSelect: "none",
+          transition: "all 0.15s",
+          transform: phase === "confirm" ? "scale(1.1)" : "scale(1)",
+        }}
+      >
+        SOS
+      </button>
+
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center" }}>
+        {phase === "confirm" ? "Keep holding…" : "Hold 3s → auto-WhatsApp all guardians"}
+      </p>
+    </div>
+  );
+}
+
+function Blink() {
+  return (
+    <>
+      <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}`}</style>
+      <div style={{
+        width: 8, height: 8, borderRadius: "50%", background: "#FF4D4D",
+        boxShadow: "0 0 8px rgba(255,77,77,0.9)", flexShrink: 0,
+        animation: "blink 1.2s ease-in-out infinite",
+      }} />
+    </>
+  );
+}
+
+function Spinner() {
+  return (
+    <>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{
+        width: 36, height: 36, border: "3px solid rgba(255,77,77,0.2)",
+        borderTopColor: "#FF4D4D", borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
     </>
   );
 }
